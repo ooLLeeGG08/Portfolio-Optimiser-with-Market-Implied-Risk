@@ -12,6 +12,9 @@ ui.header("evaluation", dim="Model", subtitle= "Out-of-sample evidence only: chr
 # --- strategy backtest ---------------------------------------------------------------------------
 ui.section("walk-forward backtest", "Portfolio strategies:")
 bb = state.backtests()
+for n in bb.notes:
+    if n.startswith("WARNING"):
+        st.warning(n.removeprefix("WARNING: "), icon=":material/warning:")
 ui.chart(charts.backtest_chart(bb.results, bb.test_start))
 cols = ["CAGR", "Annualised return", "Annualised volatility", "Max drawdown", "Annual turnover (one-way)", "Annual cost drag"]
 

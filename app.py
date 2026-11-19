@@ -11,7 +11,6 @@ st.set_page_config(page_title="Portfolio Intelligence", page_icon=":material/ins
                    layout="wide", initial_sidebar_state="auto")
 
 import config  # noqa: E402
-import visualization.theme  # noqa: E402,F401  (registers the Plotly template)
 from ui import components as ui  # noqa: E402
 from ui import state  # noqa: E402
 

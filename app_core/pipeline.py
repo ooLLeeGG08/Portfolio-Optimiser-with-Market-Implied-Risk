@@ -18,7 +18,7 @@ from backtest.walk_forward import (BacktestResult, backtest_metrics, equal_weigh
                                    fixed_weights_rule, max_sharpe_rule, min_variance_rule,
                                    walk_forward_backtest)
 from core import conventions as cv
-from core.types import DataQualityReport, PriceData, RebalanceFrequency, RiskBasis
+from core.types import DataQualityReport, PriceData, RebalanceFrequency, RiskBasis, Severity
 from data.market_data import DataSourceError, MarketDataService, RiskFreeRate
 from data.preprocessing import correlation_matrix, monthly_returns
 from forecasting.study import VolStudyConfig, VolStudyResult, run_volatility_study
@@ -128,6 +128,19 @@ def load_market_data(settings: AnalysisSettings, service: MarketDataService,
     if any(i.code in ("INSUFFICIENT_COMMON_HISTORY", "NO_USABLE_ASSETS", "NO_COMMON_DATES")
            for i in q.errors):
         raise AnalysisError(" ".join(i.message for i in q.errors if i.ticker is None))
+
+    # Warn when one asset's short history truncates the whole analysis window.
+    requested_start = settings.start_date()
+    if not pdata.prices.empty and q.aligned_start is not None and \
+            q.aligned_start > requested_start + pd.DateOffset(months=6):
+        firsts = {t: p.first_date for t, p in pdata.provenance.items()
+                  if t in pdata.prices and p.first_date is not None}
+        limiting = max(firsts, key=lambda t: max(firsts[t], requested_start)) if firsts else None
+        q.add(limiting, Severity.WARNING, "SHORT_COMMON_HISTORY",
+              f"The analysis covers only {q.aligned_start.date()} – {q.aligned_end.date()} "
+              f"({q.n_aligned_observations} trading days) instead of the requested {settings.history_years} years, "
+              f"because {limiting}'s price history starts on {firsts[limiting].date()}. All statistics, the "
+              f"optimisation and the backtest use this shorter common window.")
 
     spec = PortfolioSpec.from_weights(dict(zip(settings.tickers, settings.weights)),
                                       benchmark=settings.benchmark,
@@ -513,6 +526,11 @@ def run_backtests(mb: MarketBundle, constraints: Constraints = Constraints()) ->
              f"{split.test_start.date()} – {split.test_end.date()}.",
              "Survivorship bias: the asset list was chosen today, from assets that still exist.",
              "Past results do not indicate future performance; no strategy is claimed to beat the market."]
+    test_days = len(idx[idx >= split.test_start])
+    if test_days < 252:
+        notes.insert(0, f"WARNING: the locked test window has only {test_days} trading days because the common price "
+                        f"history is short. Results over so short a window are dominated by noise and should not be "
+                        f"used to compare strategies.")
     if user_is_ew:
         notes.append("The user-defined portfolio is equal-weighted, so it is identical to the equal-weight strategy "
                      "and is not shown separately.")
