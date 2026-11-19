@@ -101,7 +101,7 @@ docs/                       PLAN.md, METHODOLOGY.md
 ## Status
 
 - [x] Phase 1 — data layer and portfolio construction
-- [ ] Phase 2
+- [x] Phase 2 — optimisation and efficient frontier
 - [ ] Phase 3
 - [ ] Phase 4
 - [ ] Phase 5

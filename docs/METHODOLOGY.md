@@ -85,18 +85,60 @@ annualised volatility of daily simple returns.
 
 ---
 
-## 4. Portfolio optimisation *(specification — implemented in Phase 2)*
+## 4. Portfolio optimisation
 
-- **Covariance:** Ledoit–Wolf shrinkage of the sample covariance of daily simple returns,
-  annualised ×252. Raw sample covariance is noisy and drives optimisers to extreme weights.
-- **Expected returns:** annualised arithmetic mean of historical returns. This is the
-  weakest input of mean–variance optimisation; max-Sharpe weights are highly sensitive to
-  it and the app shows a warning and a sensitivity check.
-- **Strategies:** equal-weight (baseline), minimum variance, maximum Sharpe
-  ((μ_p − r_f) / σ_p), custom (long-only, per-asset min/max, fully invested).
-- **Efficient frontier:** minimum variance for a grid of target returns between the
-  min-variance return and the maximum feasible return under the constraints.
-- **No look-ahead:** estimates use only data up to the decision date.
+Implemented in `portfolio/optimization.py`, `portfolio/efficient_frontier.py`, `risk/covariance.py`.
+
+**Inputs (estimated from daily simple returns dated ≤ the decision date — no look-ahead).**
+- **Expected returns:** annualised *arithmetic* mean, μ = 252 · mean(R). The arithmetic mean
+  is the quantity that aggregates linearly across assets and enters the Sharpe ratio
+  consistently. It is by far the noisiest input: its standard error is σ_annual / √years
+  (≈ 9 % a year for a 29 %-vol stock over 10 years), which the app displays.
+- **Covariance:** Ledoit–Wolf (2004) shrinkage towards a scaled identity, rescaled from the
+  1/T to the unbiased 1/(T−1) normalisation and annualised ×252. The shrinkage intensity
+  is reported. Sample covariance is available as an alternative.
+- **Lookback:** full selected window by default; a rolling lookback is used in the
+  walk-forward backtest.
+
+**Constraints.** Long-only, fully invested (Σw = 1), per-asset minimum and maximum weights
+(scalar or per ticker). Infeasible bound sets (Σ min > 1, Σ max < 1, min > max, negative
+min) are rejected with an explanation before any solve.
+
+**Strategies.**
+| Strategy | Definition |
+|---|---|
+| Equal weight | w_i = 1/N; baseline, ignores constraints |
+| Minimum variance | min wᵀΣw |
+| Maximum Sharpe | max (wᵀμ − r_f) / √(wᵀΣw); undefined (reported, not forced) if no asset has μ_i > r_f |
+| Custom | user bounds with objective min-variance, max-Sharpe, target return (min variance s.t. wᵀμ ≥ target) or target volatility (max return s.t. σ ≤ target) |
+| User-defined | the user's own weights, evaluated with the same inputs |
+
+Solved with PyPortfolioOpt (cvxpy, CLARABEL solver). Solver output is cleaned (clipped to
+bounds, dust < 1e-8 removed, renormalised) and re-verified against the bounds. All reported
+statistics are recomputed by one function (`portfolio_stats`) so every strategy is measured
+identically.
+
+**Efficient frontier.** Minimum variance for a grid of target returns from the
+minimum-variance portfolio's return to the maximum feasible return under the bounds (an
+LP solved exactly by greedy allocation from the lower bounds). Only the efficient branch
+is drawn. Failed grid points are dropped and counted, never interpolated.
+
+**Max-Sharpe sensitivity.** Expected returns are resampled from their sampling
+distribution, μ* ~ N(μ̂, Σ / years), and the max-Sharpe portfolio is re-solved for each draw
+(default 200, fixed seed). The app reports the point weights alongside the mean and 5th–95th
+percentile of the resampled weights. On real data the ranges are typically very wide —
+i.e. the "optimal" weights are not statistically well determined.
+
+**Interpretation.** Expected return, volatility and Sharpe shown for optimised portfolios are
+**in-sample estimates** (basis: `OBSERVED` inputs, not forecasts). They overstate what the
+portfolio would have achieved out of sample, because the weights were chosen using the same
+data. Out-of-sample performance comes from the walk-forward backtest (§8).
+
+**Verification (tests).** Closed-form global-minimum-variance and tangency portfolios are
+recovered when bounds are not binding; no random feasible portfolio has lower volatility than
+min-variance or higher Sharpe than max-Sharpe; frontier volatility is non-decreasing in return
+and no random portfolio lies below exact frontier solves; the max-return LP matches scipy's
+`linprog`; future data cannot change estimates made at an earlier decision date.
 
 ---
 
