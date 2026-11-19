@@ -143,29 +143,70 @@ and no random portfolio lies below exact frontier solves; the max-return LP matc
 
 ---
 
-## 5. Risk metrics *(specification — implemented in Phase 3)*
+## 5. Risk metrics
 
-All `OBSERVED` unless stated.
+Implemented in `risk/risk_metrics.py`, `risk/var.py`, `risk/cvar.py`, `risk/tail_risk.py`,
+`risk/risk_contribution.py`. All `OBSERVED` unless stated.
 
-- Max drawdown: min_t (V_t / max_{s≤t} V_s − 1).
-- Sharpe: (μ_annual − r_f) / σ_annual using arithmetic annualised mean.
-- Sortino: (μ_annual − r_f) / downside deviation, downside deviation computed from
-  min(R_t − r_f/252, 0) and annualised ×√252.
-- Beta: Cov(R_p, R_b) / Var(R_b) on aligned daily returns.
-- **VaR / CVaR** at 95 % and 99 %, 1-day (and √h-scaled where labelled):
-  - Historical: empirical quantile of portfolio returns; CVaR = mean loss beyond VaR.
-  - Parametric normal: VaR = −(μ + z_{1−α} σ); CVaR = −μ + σ φ(z_{1−α}) / (1−α).
-  - Cornish–Fisher: skew/kurtosis-adjusted quantile (fat-tail sensitivity).
-  - Monte Carlo: multivariate Student-t simulation of asset returns with fixed seed,
-    covariance matched to the estimate; VaR/CVaR from simulated portfolio returns.
-  - Interpretation: VaR is a threshold, not a worst case; CVaR is the average loss on the
-    days that breach the threshold.
-- **Risk contribution (Euler):** σ_p = √(wᵀΣw); MCR_i = (Σw)_i / σ_p;
-  CCR_i = w_i · MCR_i; Σ_i CCR_i = σ_p exactly; %CR_i = CCR_i / σ_p.
+**Standard measures** (daily simple returns of the portfolio value path):
+- Annualised return 252·mean(R); annualised volatility √252·std(R) (ddof = 1).
+- Sharpe = (annualised return − r_f) / annualised volatility.
+- Sortino = (annualised return − r_f) / downside deviation, where downside deviation =
+  √252 · √(mean over all days of min(R_t − r_f/252, 0)²).
+- Maximum drawdown: min_t (V_t / max_{s≤t} V_s − 1), with peak, trough and recovery dates
+  and durations in trading days (recovery = first close back at the prior peak).
+- Beta = Cov(R_p, R_b) / Var(R_b) on shared dates; correlation with the benchmark.
+- Factor sensitivities (used for rate shocks): OLS slope of daily asset returns on a daily
+  factor change, with Newey–West (HAC, 5 lags) t-statistics and R² so weak or unstable
+  sensitivities are visible.
+
+**VaR and CVaR.** Loss L = −R; VaR_a = a-quantile of L; CVaR_a = E[L | L ≥ VaR_a]; both
+positive when they are losses. All methods are computed at 1 day; an h-day figure is the
+1-day figure × √h and is labelled as an i.i.d. approximation.
+
+| Method | VaR | CVaR |
+|---|---|---|
+| Historical | Empirical quantile of portfolio losses (linear interpolation) | Mean of losses ≥ VaR |
+| Parametric (normal) | −μ + σ z_a | −μ + σ φ(z_a)/(1−a) |
+| Cornish–Fisher | −(μ + σ z_CF), z_CF = z + (z²−1)S/6 + (z³−3z)K/24 − (2z³−5z)S²/36 at z = Φ⁻¹(1−a) | (1/(1−a)) ∫_a^1 VaR_CF(u) du (quadrature) |
+| Monte Carlo | Quantile of 100,000 simulated portfolio returns (fixed seed) | Mean of simulated losses ≥ VaR |
+
+- μ, σ, S (skew), K (excess kurtosis) are sample moments of the portfolio's daily returns.
+- **Cornish–Fisher validity.** The expansion is a valid quantile function only where it is
+  increasing in z. For high kurtosis (roughly K > 8, e.g. any sample containing March 2020)
+  it is not, and its VaR is badly distorted. In that case the method is **withheld** (shown
+  as "not reported" with the reason) rather than displayed.
+- **Monte Carlo.** Asset returns are drawn from a multivariate Student-t scaled so that its
+  covariance equals the sample covariance of daily asset returns, with the sample mean
+  vector; degrees of freedom by method of moments from the portfolio's excess kurtosis,
+  ν = 4 + 6/K, clamped to [4.1, 50] (normal if K ≈ 0). Portfolio return = w · R (simple
+  returns aggregate linearly). A single ν for all assets is a simplification.
+- **Forward-looking VaR** (from a D·R·D covariance, §6) uses parametric-normal and Monte
+  Carlo methods with zero expected return; no historical method exists for a forecast
+  covariance. It inherits the covariance's basis label.
+- **Interpretation.** VaR is a threshold, not a worst case; CVaR is the average loss on the
+  days beyond that threshold. A 99 % 1-day historical VaR from 10 years rests on about 25
+  observations; from 2 years, about 5 — the app states the count.
+
+**Risk contribution (Euler).** σ_p = √(wᵀΣw); MCR_i = (Σw)_i / σ_p; CCR_i = w_i·MCR_i;
+Σ_i CCR_i = σ_p exactly (σ_p is homogeneous of degree one in w); %CR_i = CCR_i / σ_p.
+Negative contributions mean the asset hedges the rest of the portfolio. Under a zero-mean
+normal model VaR_a = z_a σ_p, so each asset's share of VaR equals %CR_i. Works with any
+covariance (historical, forecast, implied, stressed) and inherits its basis.
+
+**Verification (tests).** Hand-calculated drawdown, Sharpe and Sortino; beta and rate
+sensitivity recovered from synthetic data; parametric formulas against closed forms;
+Cornish–Fisher reduces to normal when S = K = 0; historical and Monte Carlo VaR/CVaR converge
+to the normal closed forms on large normal samples; Student-t simulation reproduces the
+target covariance; CVaR ≥ VaR and VaR₉₉ > VaR₉₅ for every method; Euler contributions sum
+to σ_p and marginal contributions match numerical derivatives.
 
 ---
 
-## 6. Forward-looking covariance: Σ = D · R · D *(specification — implemented in Phase 3)*
+## 6. Forward-looking covariance: Σ = D · R · D
+
+Implemented in `risk/covariance.py` (`VolatilityVector`, `build_forward_covariance`,
+`stress_correlation`, `nearest_correlation`, `correlation_stress_profile`).
 
 To translate per-asset volatility estimates (historical, GARCH, LSTM, market-implied or
 proxy) into portfolio risk, the covariance matrix is rebuilt as
@@ -185,8 +226,12 @@ proxy) into portfolio risk, the covariance matrix is rebuilt as
    `MARKET_IMPLIED` vols it mixes risk-neutral volatility with historical correlation and is
    labelled as such; if any σ_i is a proxy the result is labelled `IMPLIED_PROXY`.
 5. **Positive semi-definiteness** holds automatically if R is a valid correlation matrix;
-   R is checked (and projected to the nearest valid correlation matrix if needed, with a
-   warning).
+   R is checked (unit diagonal, |ρ| ≤ 1, PSD) and, if invalid, projected to the nearest
+   valid correlation matrix by Higham's (2002) alternating-projections algorithm, with a
+   recorded note.
+
+Basis precedence when inputs are mixed: hypothetical > implied proxy > market-implied >
+forecast > observed — the least-observed component labels the result.
 
 **Correlation stress testing.** Because assumption 1 is the weakest link, every
 forward-looking risk figure can be recomputed under stressed correlations:
@@ -320,17 +365,32 @@ Residual mismatch (calendar vs trading-day variance accrual) is documented.
 
 ---
 
-## 10. Stress testing *(specification — implemented in Phase 3)* — all `HYPOTHETICAL`
+## 10. Stress testing — all `HYPOTHETICAL`
 
-- Market decline of x %: asset shock_i = β_i · x (β from historical regression on the
-  benchmark); idiosyncratic component ignored (stated).
-- Volatility increase: D scaled by a factor k; risk recomputed.
-- Correlation convergence: R_λ as in §6.
-- Interest-rate shock: per-asset sensitivity to daily changes in the 10-year yield (^TNX)
-  estimated by regression; equity rate sensitivities are weak and unstable (stated).
-- Single-asset shock and fully custom shock vectors.
-Results: portfolio loss, asset contributions, post-scenario value, baseline vs stressed risk.
-Stress tests are not predictions and are never labelled as such.
+Implemented in `risk/stress_testing.py`. Every result is labelled "Hypothetical scenario —
+not a prediction".
+
+**Price-shock scenarios** — instantaneous per-asset simple-return shocks, floored at −100 %;
+portfolio return = Σ w_i shock_i; asset P&L = w_i · shock_i · value; value after the shock.
+| Scenario | Asset shock |
+|---|---|
+| Market decline x % (default −10 %, −20 %) | β_i · x, with β from historical daily returns against the benchmark |
+| Interest-rate shock Δ bp | s_i · Δ/100, s_i = sensitivity to a 1-percentage-point change in the 10-year yield (^TNX) |
+| Single-asset shock | user-specified for chosen assets; others unchanged |
+| Custom | any per-asset shock vector |
+
+Assumptions shown with the results: idiosyncratic moves are ignored; betas and rate
+sensitivities are estimated in normal markets and can change abruptly in a crisis (e.g.
+bonds and equities fell together in 2022); equity rate sensitivities are small and
+statistically weak (their t-statistics are shown); the response is linear (no convexity).
+Sanity check on real data: TLT's estimated sensitivity is about −0.15 per percentage point,
+consistent with its ~15–17-year duration.
+
+**Risk-regime scenarios** — the covariance is stressed and compared with the baseline
+(annualised volatility and 1-day zero-mean parametric VaR at 95 % / 99 %, plus Euler risk
+contributions under stress):
+- Volatility increase ×k: Σ → k²Σ (correlations unchanged).
+- Correlation convergence: R → (1−λ)R + λ11ᵀ, optionally combined with ×k volatility.
 
 ---
 

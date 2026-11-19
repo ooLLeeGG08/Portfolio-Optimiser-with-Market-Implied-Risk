@@ -102,7 +102,7 @@ docs/                       PLAN.md, METHODOLOGY.md
 
 - [x] Phase 1 — data layer and portfolio construction
 - [x] Phase 2 — optimisation and efficient frontier
-- [ ] Phase 3
+- [x] Phase 3 — risk metrics, VaR/CVaR, risk contributions, D·R·D, stress tests
 - [ ] Phase 4
 - [ ] Phase 5
 - [ ] Phase 6
