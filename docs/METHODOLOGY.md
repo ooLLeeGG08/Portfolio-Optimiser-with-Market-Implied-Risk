@@ -60,7 +60,8 @@ some dates; this is documented in the data-quality report.
   only survivors.
 - Adjusted prices are revised retroactively; re-runs on a later date can differ slightly.
 - Yahoo applies rate limits; the cache mitigates but cannot eliminate this.
-- Single-stock option data is a current snapshot only (no history) — see §9.
+- Single-stock option data is a current snapshot only (no history), often delayed, and
+  thin for many strikes/expiries — see §9.
 
 ---
 
@@ -346,47 +347,86 @@ development window.
 
 ---
 
-## 9. Market-implied volatility *(specification — implemented in Phase 5)*
+## 9. Market-implied volatility
 
-**VIX (`MARKET_IMPLIED`).** The CBOE VIX is the risk-neutral expected volatility of the
-S&P 500 over the next ~30 calendar days, derived from SPX option prices. It is **not** a
-volatility forecast for individual stocks and is never used as one. Displayed: latest
-observation and date, history, rolling averages, percentile rank in its own history,
-changes.
+Implemented in `implied_volatility/` (`vix.py`, `options_data.py`, `proxy.py`,
+`comparison.py`) and `MarketDataProvider.fetch_option_chain`.
 
-**Option-chain implied vol (`MARKET_IMPLIED`, `IVSource.OPTIONS_CHAIN`).** Per-asset implied
-vols from listed option chains (current snapshot only). Quotes are filtered: zero bid,
-bid/ask spread above threshold, low open interest/volume, stale last trade, and
-implausible IV values are excluded and counted. ATM IV per expiry = interpolation of call
-and put IVs nearest the forward/spot; smile/skew shown only when enough strikes survive the
-filters. Term structure interpolated to the comparison horizon (variance-linear in time).
+Every implied figure carries a source (`IVSource`): `VIX index` and `listed option chain` are
+market data (basis `MARKET_IMPLIED`); `proxy estimate` is not (basis `IMPLIED_PROXY`, shown
+as "Implied-vol proxy (estimate, not market data)"); `unavailable` is reported as such.
 
-**Implied-vol proxy (`IMPLIED_PROXY`, `IVSource.PROXY`).** Where no usable option data
-exists: σ_proxy,i = σ_hist,i × (VIX / realised S&P 500 vol). This assumes each asset's
-implied/realised ratio equals the index's. It is an **estimate**, shown with a distinct
-label and style, never under "market-implied", and excluded from any statistic described as
-market-implied.
+**VIX** (`MARKET_IMPLIED`, `IVSource.VIX_INDEX`). The CBOE VIX is the risk-neutral expected
+volatility of the S&P 500 over the next ~30 calendar days, derived from SPX option prices. It
+is **not** a volatility forecast for individual stocks and is never used as one. Shown: latest
+observation and date; changes over 1, 5 and 21 days (volatility points); 20/60/252-day
+rolling means; percentile rank of the latest value in the full history (since 1990) and the
+last 5 years.
+- *Variance risk premium (ex post):* VIX at t versus S&P 500 (SPY) realised volatility over
+  the next 21 trading days (the §7 target definition). Historically VIX exceeds subsequently
+  realised volatility on most days (≈ 84 % of days since 2005, by ≈ 3.6 vol points on average
+  in our data) — the premium option buyers pay for volatility protection.
+- *VIX vs ATM implied vol:* VIX is a variance-swap-style index that integrates the whole
+  strike range, including expensive out-of-the-money puts, so it usually sits above the
+  at-the-money implied volatility of SPY options. Both are shown; they are not expected to match.
 
-**Interpretation.** Implied volatility is risk-neutral and typically exceeds subsequently
-realised volatility because of the volatility risk premium. A gap between implied and
-forecast volatility is **not** evidence that options are mispriced.
+**Option-chain implied volatility** (`MARKET_IMPLIED`, `IVSource.OPTIONS_CHAIN`; current
+snapshot only — no history is available from this provider).
+- *Our own IV, not the provider's:* implied vols are computed from bid/ask **mid** prices with
+  the Black-76 model on the forward, inverted by Brent's method. The provider's
+  `impliedVolatility` field (undocumented model) is kept only as a cross-check; on live data
+  the median difference is within ±1 vol point.
+- *Forward:* from put–call parity F = K + e^{rT}(C − P), median over the three strikes nearest
+  spot where both call and put pass the filters; this avoids assuming a dividend yield. If no
+  pair exists, F = S·e^{rT} (dividends ignored) and the expiry is flagged.
+- *Time to expiry:* calendar time from the quote timestamp to 16:00 New York on the expiry
+  date, /365. Rate r = the risk-free rate (§1).
+- *Quote filters* (each exclusion counted by reason; missing data fails a filter): bid ≥ 0.01;
+  ask > bid; (ask − bid)/mid ≤ 50 %; open interest ≥ 10; last trade within 5 calendar days;
+  expiry ≥ 7 calendar days (ATM/term structure); |ln(K/F)| ≤ 0.5; price within no-arbitrage
+  bounds; 1 % ≤ IV ≤ 300 %. Typically only 30–50 % of listed quotes survive.
+- *ATM IV per expiry:* from out-of-the-money options only (puts K < F, calls K ≥ F — smallest
+  early-exercise premium; Black-76 is a European model and listed equity options are
+  American, an approximation that is stated), linear interpolation in log-moneyness
+  k = ln(K/F) to k = 0 between the nearest valid quotes on each side. Requires ≥ 4 valid OTM
+  quotes in the expiry.
+- *Horizon IV:* the forecast horizon h trading days is converted to h·365/252 calendar days
+  (21 → ≈ 30.4, matching VIX's 30 days). Total implied variance w(T) = σ²T is interpolated
+  linearly between the bracketing expiries; σ = √(w/T). If no bracketing pair exists, the
+  nearest expiry is used flat and the estimate is marked not reliable.
+- *Smile/skew:* valid quotes for a chosen expiry, IV against strike and log-moneyness, calls
+  and puts distinguished.
 
-**Volatility Disagreement Indicator (analytical, not a trading signal).** For each asset,
-at a common horizon (default 21 trading days, annualised), compare historical, GARCH,
-LSTM, and implied (or proxy) vol:
-- Dispersion D = standard deviation of the log of the available estimates (scale-free;
-  0 = full agreement). Reported with which estimates were available and their bases.
-- Implied-to-forecast ratio IV / mean(model forecasts), only when actual market-implied IV
-  is available.
-- Context: percentile of the model-only dispersion in its own history (implied vol has no
-  single-stock history in this data source, so the percentile is computed only for model
-  estimates).
-Displayed as "Low / Moderate / High disagreement" bands with the explicit note that
-disagreement reflects model and information differences and is not a buy/sell signal.
+**Implied-volatility proxy** (`IMPLIED_PROXY`, `IVSource.PROXY` — an estimate, not market
+data). Used only when no usable option-chain IV exists, with the reason recorded:
+σ_proxy,i = σ_hist,i × (VIX / σ_hist,S&P), with 60-day trailing realised volatilities of the
+asset and SPY on the same date as VIX. Assumes the asset's implied/realised ratio equals the
+index's (transfers the index's current risk premium and fear level; ignores asset-specific
+events). Any covariance built with a proxy is labelled `IMPLIED_PROXY` (§6). The proxy is
+excluded from every statistic described as market-implied, and no implied-to-forecast ratio
+is computed from it.
 
-**Horizon alignment.** VIX is a 30-calendar-day (~21 trading-day) measure; option-chain IV
-is interpolated to h; model forecasts are produced for h. All are annualised the same way.
-Residual mismatch (calendar vs trading-day variance accrual) is documented.
+**Implied vs forecast comparison.** For each asset at the common horizon h (annualised):
+historical (trailing 60-day realised, `OBSERVED`), GARCH and LSTM (`FORECAST`, with 10–90 %
+intervals), and implied (`MARKET_IMPLIED`) or proxy (`IMPLIED_PROXY`). For the S&P 500,
+VIX is additionally aligned with the out-of-sample GARCH/LSTM forecasts and the subsequently
+realised volatility over the test window. Implied volatility is risk-neutral and contains a
+volatility risk premium; a gap between implied and forecast volatility is **not** evidence
+that options are over- or under-priced.
+
+**Volatility Disagreement Indicator** (analytical comparison — not a trading signal).
+- *Dispersion* D = population standard deviation of the logs of the available estimates
+  (scale-free; D = 0.10 means the estimates sit roughly ±10 % around their geometric mean).
+  Reported for all estimates and for the models only (historical, GARCH, LSTM).
+- *Bands* (fixed a priori): Low D < 0.10; Moderate 0.10 ≤ D < 0.25; High D ≥ 0.25.
+- *Implied-to-forecast ratio* IV / mean(GARCH, LSTM), computed only when actual option-chain
+  IV is available.
+- *Context:* percentile of today's model-only dispersion within its own history of
+  out-of-sample forecasts (the test window). Implied volatility has no single-stock history
+  in this data source, so it has no percentile.
+- *Interpretation:* disagreement reflects different information sets (backward-looking data
+  vs forward-looking, risk-neutral prices) and model assumptions — e.g. GARCH reacting faster
+  than a 60-day window to a recent volatility jump. It is not a buy/sell signal.
 
 ---
 

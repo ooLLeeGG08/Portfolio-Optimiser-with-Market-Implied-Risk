@@ -104,7 +104,7 @@ docs/                       PLAN.md, METHODOLOGY.md
 - [x] Phase 2 — optimisation and efficient frontier
 - [x] Phase 3 — risk metrics, VaR/CVaR, risk contributions, D·R·D, stress tests
 - [x] Phase 4 — historical, GARCH and LSTM volatility forecasting with intervals and OOS evaluation
-- [ ] Phase 5
+- [x] Phase 5 — VIX, option-chain IV, IV proxy, implied-vs-forecast comparison, Volatility Disagreement Indicator
 - [ ] Phase 6
 - [ ] Phase 7
 - [ ] Phase 8

@@ -35,8 +35,24 @@ class DataSourceError(RuntimeError):
     """The data source could not be reached or refused the request."""
 
 
+@dataclass(frozen=True)
+class OptionChainRaw:
+    """Raw listed-option quotes for one underlying, as delivered by the provider.
+
+    ``quotes`` columns: expiry (Timestamp), type ('call'/'put'), strike, bid, ask, last,
+    volume, open_interest, last_trade (UTC Timestamp), provider_iv.
+    """
+
+    ticker: str
+    spot: float
+    quote_time: datetime  # UTC time of the underlying quote
+    quotes: pd.DataFrame
+    source: str
+
+
 class MarketDataProvider(ABC):
     name: str = "abstract"
+    supports_options: bool = False
 
     @abstractmethod
     def fetch_history(self, tickers: list[str]) -> dict[str, pd.Series]:
@@ -46,6 +62,12 @@ class MarketDataProvider(ABC):
         provider returned no data for it. Must not fill or interpolate missing values.
         Raise DataSourceError if the source itself is unavailable.
         """
+
+    def fetch_option_chain(self, ticker: str, max_days: int = 400) -> OptionChainRaw | None:
+        """Listed option quotes for expiries within ``max_days`` calendar days, or None if
+        the provider has no option data for the ticker. Providers without option data
+        keep this default."""
+        return None
 
 
 def drop_incomplete_session(series: pd.Series, now: datetime | None = None) -> pd.Series:
@@ -62,6 +84,7 @@ def drop_incomplete_session(series: pd.Series, now: datetime | None = None) -> p
 
 class YFinanceProvider(MarketDataProvider):
     name = "Yahoo Finance (yfinance)"
+    supports_options = True
 
     def __init__(self, tz_cache_dir=None):
         import yfinance as yf
@@ -96,6 +119,47 @@ class YFinanceProvider(MarketDataProvider):
             else:
                 out[t] = empty_series(t)
         return out
+
+
+    def fetch_option_chain(self, ticker: str, max_days: int = 400) -> OptionChainRaw | None:
+        try:
+            tk = self._yf.Ticker(ticker)
+            expiries = list(tk.options)
+        except Exception as exc:
+            raise DataSourceError(f"Option expiries for {ticker} could not be retrieved: {exc}") from exc
+        if not expiries:
+            return None
+        now = datetime.now(timezone.utc)
+        horizon = pd.Timestamp(now.date()) + pd.Timedelta(days=max_days)
+        frames, spot, qtime = [], None, None
+        for e in expiries:
+            exp = pd.Timestamp(e)
+            if exp > horizon:
+                break
+            try:
+                ch = tk.option_chain(e)
+            except Exception as exc:
+                raise DataSourceError(f"Option chain {ticker} {e} could not be retrieved: {exc}") from exc
+            und = ch.underlying if isinstance(ch.underlying, dict) else {}
+            if spot is None and und.get("regularMarketPrice"):
+                spot = float(und["regularMarketPrice"])
+                if und.get("regularMarketTime"):
+                    qtime = datetime.fromtimestamp(int(und["regularMarketTime"]), tz=timezone.utc)
+            for kind, df in (("call", ch.calls), ("put", ch.puts)):
+                if df is None or df.empty:
+                    continue
+                frames.append(pd.DataFrame({
+                    "expiry": exp, "type": kind, "strike": df["strike"].astype(float),
+                    "bid": df["bid"].astype(float), "ask": df["ask"].astype(float),
+                    "last": df["lastPrice"].astype(float),
+                    "volume": pd.to_numeric(df["volume"], errors="coerce"),
+                    "open_interest": pd.to_numeric(df["openInterest"], errors="coerce"),
+                    "last_trade": pd.to_datetime(df["lastTradeDate"], utc=True),
+                    "provider_iv": df["impliedVolatility"].astype(float),
+                }))
+        if not frames or spot is None:
+            return None
+        return OptionChainRaw(ticker, spot, qtime or now, pd.concat(frames, ignore_index=True), self.name)
 
 
 @dataclass(frozen=True)
@@ -223,6 +287,12 @@ class MarketDataService:
         if s.empty and not report.errors:
             report.add(ticker, Severity.ERROR, "NO_DATA", f"{ticker}: no data returned.")
         return s, prov, report
+
+    def get_option_chain(self, ticker: str, max_days: int = 400) -> OptionChainRaw | None:
+        """Current option-chain snapshot (not cached: quotes are only meaningful when fresh)."""
+        if not self.provider.supports_options:
+            return None
+        return self.provider.fetch_option_chain(ticker, max_days)
 
     def latest_risk_free_rate(self, refresh: bool = False) -> RiskFreeRate | None:
         """Latest 13-week T-bill yield (^IRX, quoted as a percent discount yield),
