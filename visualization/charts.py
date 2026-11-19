@@ -214,14 +214,7 @@ def _rgba(hex_color: str, alpha: float) -> str:
 
 
 def as_basis(b) -> RiskBasis | None:
-    """Recover a RiskBasis from an enum, its value or its name (pandas may store enums as text)."""
-    if isinstance(b, RiskBasis):
-        return b
-    if isinstance(b, str):
-        for r in RiskBasis:
-            if b in (r.value, r.name, str(r), f"RiskBasis.{r.name}"):
-                return r
-    return None
+    return RiskBasis.coerce(b)
 
 
 def volatility_comparison_chart(rows: pd.DataFrame, horizon: int) -> go.Figure:

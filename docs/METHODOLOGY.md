@@ -471,3 +471,23 @@ contributions under stress):
 - Correlations are unstable and rise in crises.
 - Realised volatility is itself a noisy estimate of true volatility.
 - Free data sources have gaps, revisions and survivorship bias.
+
+---
+
+## 12. PDF risk report
+
+Implemented in `reporting/` (`pdf_generator.py`, `report_charts.py`) from a `ReportData` object
+assembled by `app_core.pipeline.assemble_report` — the same results the app displays; no static
+content. Fifteen sections: the fourteen requested plus a dedicated **Model limitations and
+data quality** section built from this run (data-quality issues, series provenance with
+download times and first/last observations, option-quote exclusions by reason, and model
+limitations actually observed, e.g. withheld Cornish–Fisher estimates, LSTM interval
+under-coverage, early stopping, max-Sharpe fallbacks, proxy usage).
+
+The cover lists the generation time and every observation date (prices, risk-free rate, VIX,
+option quotes, forecasts). Every figure carries its basis label; pages are numbered "Page x of
+y". If forecasts or option data are not included, the affected sections say so explicitly
+rather than being omitted silently. Fonts: DejaVu Sans (bundled with matplotlib) for full
+Greek and mathematical symbol coverage. Tests (`tests/test_report.py`) generate a report from
+synthetic data and read it back to check pagination, section order, actual figures and dates,
+basis labels and the proxy distinction.

@@ -86,7 +86,7 @@ def walk_forward_backtest(prices: pd.DataFrame, rule: WeightRule, name: str,
     cols = list(prices.columns)
     pos0 = rets.index.get_loc(start)
     value, w = initial_value, np.zeros(len(cols))
-    values, out_rets, tw_rows, to_rows, cost_rows, fallbacks = [], [], {}, {}, {}, 0
+    values, tw_rows, to_rows, cost_rows, fallbacks = [], {}, {}, {}, 0
     for p in range(pos0, len(rets)):
         d = rets.index[p]
         if p > pos0:

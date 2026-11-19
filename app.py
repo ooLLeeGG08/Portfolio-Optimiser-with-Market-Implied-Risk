@@ -32,6 +32,9 @@ pages = {
         st.Page("views/scenarios.py", title="Scenario Analysis", icon=":material/bolt:"),
         st.Page("views/evaluation.py", title="Model Evaluation", icon=":material/fact_check:"),
     ],
+    "Output": [
+        st.Page("views/report.py", title="PDF Report", icon=":material/picture_as_pdf:"),
+    ],
 }
 nav = st.navigation(pages)
 

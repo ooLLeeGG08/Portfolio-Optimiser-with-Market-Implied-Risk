@@ -18,8 +18,7 @@ from backtest.walk_forward import (BacktestResult, backtest_metrics, equal_weigh
                                    fixed_weights_rule, max_sharpe_rule, min_variance_rule,
                                    walk_forward_backtest)
 from core import conventions as cv
-from core.types import (DataQualityReport, IVSource, PriceData, RebalanceFrequency, RiskBasis,
-                        Severity)
+from core.types import DataQualityReport, PriceData, RebalanceFrequency, RiskBasis
 from data.market_data import DataSourceError, MarketDataService, RiskFreeRate
 from data.preprocessing import correlation_matrix, monthly_returns
 from forecasting.study import VolStudyConfig, VolStudyResult, run_volatility_study
@@ -156,9 +155,11 @@ def load_market_data(settings: AnalysisSettings, service: MarketDataService,
     else:
         rf_value, rf_source = settings.risk_free_rate, "entered by user"
 
-    def series(ticker, transform=lambda s: s):
+    def series(ticker, transform=lambda s: s, full_history: bool = False):
+        start = None if full_history else settings.start_date(max(settings.forecast_history_years,
+                                                                   settings.history_years))
         try:
-            s, _, rep = service.get_series(ticker, start=settings.start_date(max(settings.forecast_history_years, settings.history_years)), refresh=refresh)
+            s, _, rep = service.get_series(ticker, start=start, refresh=refresh)
             if s.empty:
                 errors.append(f"{ticker} unavailable: {'; '.join(i.message for i in rep.errors)}")
                 return None
@@ -171,7 +172,7 @@ def load_market_data(settings: AnalysisSettings, service: MarketDataService,
                          horizon_days=spec.horizon_days, risk_free_rate=rf_value,
                          rebalance=spec.rebalance, initial_value=spec.initial_value)
     return MarketBundle(settings, pdata.prices[assets], pdata.prices[settings.benchmark], pdata,
-                        rf, rf_value, rf_source, series(config.VIX_TICKER, vx.to_decimal),
+                        rf, rf_value, rf_source, series(config.VIX_TICKER, vx.to_decimal, full_history=True),
                         series(config.TEN_YEAR_YIELD_TICKER), spec, message, errors)
 
 
@@ -321,6 +322,11 @@ def run_forecasts(mb: MarketBundle, pa: PortfolioAnalysis, service: MarketDataSe
         failures["Portfolio"] = str(exc)
     progress(1.0, "Done")
 
+    return forecast_bundle(h, studies, failures)
+
+
+def forecast_bundle(h: int, studies: dict[str, VolStudyResult],
+                    failures: dict[str, str] | None = None) -> ForecastBundle:
     rows = {}
     for name, s in studies.items():
         L = s.latest
@@ -333,7 +339,7 @@ def run_forecasts(mb: MarketBundle, pa: PortfolioAnalysis, service: MarketDataSe
             "LSTM 10%": L.loc["LSTM", "lower"], "LSTM 90%": L.loc["LSTM", "upper"],
             "As of": L["as_of"].iloc[0],
         }
-    return ForecastBundle(h, studies, failures, pd.DataFrame(rows).T)
+    return ForecastBundle(h, studies, failures or {}, pd.DataFrame(rows).T)
 
 
 # =========================================================================================
@@ -513,3 +519,40 @@ def run_backtests(mb: MarketBundle, constraints: Constraints = Constraints()) ->
     for r in res.values():
         notes += [f"{r.name}: {n}" for n in r.notes]
     return BacktestBundle(res, dev, test, split.test_start, notes)
+
+
+# =========================================================================================
+# Stage 8: report data
+# =========================================================================================
+
+@dataclass
+class ReportData:
+    mb: MarketBundle
+    pa: PortfolioAnalysis
+    oa: OptimizationAnalysis
+    bb: BacktestBundle
+    scenarios: list[st.ScenarioResult]
+    forward: dict[str, ForwardRisk]  # available volatility sources
+    forward_errors: dict[str, str]
+    fb: ForecastBundle | None
+    ib: ImpliedBundle | None
+    generated_at: pd.Timestamp  # UTC
+
+
+def assemble_report(mb: MarketBundle, pa: PortfolioAnalysis, oa: OptimizationAnalysis,
+                    bb: BacktestBundle, fb: ForecastBundle | None,
+                    ib: ImpliedBundle | None) -> ReportData:
+    forward, errors = {}, {}
+    for src in VOL_SOURCES:
+        if src in ("GARCH(1,1)", "LSTM") and fb is None:
+            errors[src] = "volatility forecasts were not computed"
+            continue
+        if src == "Implied" and ib is None:
+            errors[src] = "option data were not loaded"
+            continue
+        try:
+            forward[src] = forward_risk(mb, pa, src, fb, ib)
+        except ValueError as exc:
+            errors[src] = str(exc)
+    return ReportData(mb, pa, oa, bb, default_scenarios(mb, pa), forward, errors, fb, ib,
+                      pd.Timestamp.now(tz="UTC"))

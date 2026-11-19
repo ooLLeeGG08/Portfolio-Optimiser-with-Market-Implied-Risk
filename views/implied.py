@@ -3,7 +3,7 @@ import streamlit as st
 
 from core.types import IVSource, RiskBasis
 from implied_volatility.comparison import VDI_DISCLAIMER, disagreement_table, index_implied_vs_forecast
-from implied_volatility.options_data import horizon_implied_vol, trading_to_calendar_days
+from implied_volatility.options_data import trading_to_calendar_days
 from implied_volatility.vix import VIX_DESCRIPTION
 from ui import components as ui
 from ui import state
@@ -33,7 +33,8 @@ else:
         ui.kpi("Change, 1 day", f"{v.change_1d * 100:+.1f} pts", delta=f"21 days: {v.change_21d * 100:+.1f} pts",
                help="Change in VIX in volatility points.")
     with c[2]:
-        ui.kpi("Percentile since 1990", f"{v.percentile_full:.0%}", help=f"Share of days since {v.history_start:%Y} with VIX at or below today's level.")
+        ui.kpi(f"Percentile since {v.history_start:%Y}", f"{v.percentile_full:.0%}",
+               help=f"Share of days since {v.history_start:%d %b %Y} with VIX at or below today's level.")
     with c[3]:
         ui.kpi("Percentile, last 5 years", f"{v.percentile_5y:.0%}")
     with c[4]:

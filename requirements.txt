@@ -171,6 +171,8 @@ pygments==2.21.0
     # via pytest
 pyparsing==3.3.3
     # via matplotlib
+pypdf==7.1.1
+    # via -r requirements.in
 pyportfolioopt==1.6.0
     # via -r requirements.in
 pytest==9.2.0

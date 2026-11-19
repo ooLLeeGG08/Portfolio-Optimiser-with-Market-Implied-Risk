@@ -17,6 +17,17 @@ class RiskBasis(str, Enum):
     IMPLIED_PROXY = "implied proxy (estimate)"
     HYPOTHETICAL = "hypothetical"
 
+    @classmethod
+    def coerce(cls, value) -> "RiskBasis | None":
+        """Recover a RiskBasis from an enum, its value or its name (pandas may store enums as text)."""
+        if isinstance(value, cls):
+            return value
+        if isinstance(value, str):
+            for r in cls:
+                if value in (r.value, r.name, f"RiskBasis.{r.name}", r.label):
+                    return r
+        return None
+
     @property
     def label(self) -> str:
         return {
