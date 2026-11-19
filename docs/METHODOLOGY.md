@@ -243,79 +243,104 @@ The app shows portfolio volatility, VaR and risk contributions as a function of 
 
 ---
 
-## 7. Volatility forecasting *(specification — implemented in Phase 4)*
+## 7. Volatility forecasting
+
+Implemented in `forecasting/` (`targets.py`, `historical_volatility.py`, `garch_model.py`,
+`lstm_model.py`, `evaluation.py`, `study.py`) and `backtest/splits.py`. Basis: `FORECAST`
+(rolling historical vol displayed as history is `OBSERVED`).
 
 **Target (single definition, `forecasting.targets`).** Realised volatility over the next h
 trading days, annualised:
 
   RV_{t,h} = √( (252 / h) · Σ_{k=1..h} r_{t+k}² )
 
-using daily log returns and a zero-mean assumption (standard for short horizons; the mean
-is negligible relative to volatility at daily frequency). Default h = 21. A forecast made at
-the close of day t uses only data up to and including day t.
+from daily log returns, zero-mean (the daily mean is negligible relative to volatility).
+Default h = 21. The same formula looking backwards, RV^back_{t,w}, is the historical
+volatility; by construction RV_{t,h} = RV^back_{t+h,h} (tested). A forecast made at the close
+of day t uses only data up to and including day t.
 
-**Historical volatility.** Rolling 20/60/252-day standard deviation of log returns,
-annualised. Used as a naive forecast of RV_{t,h} (random-walk-in-volatility benchmark).
+**Historical volatility.** Trailing 20/60/252-day RV^back, used unchanged as the forecast of
+RV_{t,h} (a random walk in volatility).
 
-**GARCH(1,1)** via `arch`: σ²_t = ω + α ε²_{t−1} + β σ²_{t−1}, with normal or Student-t
-innovations, fitted to percentage log returns. Walk-forward: parameters refitted on an
-expanding window at a fixed interval (default every 21 days) using data up to t only.
-The h-day forecast sums the 1…h step variance forecasts:
-RV̂_{t,h} = √( (252/h) · Σ_k σ̂²_{t+k|t} ).
-Diagnostics: persistence α+β, half-life ln(0.5)/ln(α+β), Ljung–Box on standardised and
-squared standardised residuals, parameter standard errors.
+**GARCH(1,1)** (`arch`, constant mean, percent log returns):
+σ²_t = ω + α ε²_{t−1} + β σ²_{t−1}. Innovations normal or Student-t, chosen by BIC on
+development data only.
+- *Timing* (verified against a hand-written recursion): estimation with `last_obs = k` uses
+  observations 0…k−1; a forecast row dated t is σ²_{t+1…t+h | t}. Walk-forward therefore
+  refits with `last_obs = position(t) + 1`.
+- *Walk-forward:* parameters re-estimated every 21 trading days on an expanding window;
+  between refits the variance filter is updated with each new return using fixed parameters.
+  A test perturbs all returns after a date and checks every earlier forecast is unchanged.
+- *h-day forecast:* RV̂_{t,h} = √((252/h) Σ_k σ̂²_{t+k|t}) / 100.
+- *Diagnostics:* α, β with standard errors, persistence α+β, half-life ln 0.5 / ln(α+β),
+  unconditional volatility √(ω/(1−α−β))·√252, Ljung–Box (lag 10) on standardised and squared
+  standardised residuals, AIC/BIC.
+- *Intervals:* 500 simulated h-day return paths per forecast date from the fitted model, with
+  a seeded innovation generator (arch's own `random_state` is not honoured in simulation, so
+  a custom generator is supplied — otherwise intervals would not be reproducible). The
+  realised vol of each path gives the predictive distribution; 10/50/90 % quantiles are
+  reported. Parameter-estimation uncertainty is not included.
 
-**GARCH uncertainty.** Simulation-based forecast distribution: paths of h daily returns
-are simulated from the fitted model (innovations drawn from the fitted distribution); the
-realised vol of each path gives a predictive distribution of RV_{t,h}, from which 10 %,
-50 % and 90 % quantiles are reported. This captures innovation uncertainty but not
-parameter-estimation uncertainty (stated as a limitation).
+**LSTM** (PyTorch). Hyper-parameters fixed a priori (`LSTMConfig`): sequence length 60, one
+LSTM layer of 32 units, dropout 0.1, Adam (lr 1e-3, weight decay 1e-5), batch 64, at most 150
+epochs, early-stopping patience 15, gradient clipping 1.0, seed 42 with deterministic
+algorithms.
+- *Features at t* (data ≤ t only, tested by perturbing future returns): log return, |r|,
+  log RV^back over 5, 21 and 63 days.
+- *Target:* log RV_{t,h}.
+- *Splits:* the development window (before the locked test window, §8) is divided
+  chronologically into train 70 % / validation 15 % / calibration 15 %, with an h-day purge
+  gap between consecutive segments so no target window spans two segments. Validation drives
+  early stopping; calibration is used only for the conformal step.
+- *Scaling:* `StandardScaler` fitted on feature rows dated up to the last training date only
+  (tested).
+- *Output:* 10/50/90 % quantiles of log RV with non-crossing guaranteed by construction
+  (q10 = m − softplus(a), q90 = m + softplus(b)); pinball loss. Point forecast = median.
+- *Checkpointing:* the best-validation-epoch weights are saved to `.cache/checkpoints/` and
+  restored before use.
+- *Calibration (CQR):* scores E_i = max(q10_i − y_i, y_i − q90_i) on the calibration segment;
+  the interval is widened by the ⌈(n+1)·0.8⌉/n empirical quantile of E (negative values
+  narrow it). This guarantees ≥ 80 % coverage only under exchangeability, which time series
+  violate when the volatility regime shifts; test-window coverage is therefore always
+  reported and can fall short.
+- The LSTM is trained once on development data and not retrained in the test window (GARCH
+  is refitted); this favours GARCH slightly and is stated.
 
-**LSTM.** Small network (1–2 layers, ~32 hidden units, dropout). Inputs: sequences
-(default length 60) of log return, |r|, r², and 5/21/63-day realised vol, all computed with
-data ≤ t. Target: log RV_{t,h}. Chronological 70/15/15 train/validation/test split with an
-**h-day purge gap** between consecutive segments (otherwise the last training target
-window overlaps the first validation window). Feature scaler fitted on training data only.
-Fixed seeds, Adam, early stopping on validation loss, best-epoch checkpoint.
-
-**LSTM uncertainty.** The network outputs the 10 %, 50 % and 90 % quantiles of log RV
-(pinball loss). Intervals are then **split-conformally calibrated** on the validation
-segment (conformalised quantile regression), which gives finite-sample coverage
-guarantees under exchangeability. Exchangeability is only approximate for time series,
-so **empirical coverage on the test segment is always reported**.
-
-**Evaluation (out-of-sample only).** MAE, RMSE, bias (mean of forecast − realised),
-directional accuracy (sign of forecast change vs sign of realised change), QLIKE loss
-(robust to noise in the realised-vol proxy), and interval coverage / width where intervals
-exist.
-
-**Overlapping horizons.** Daily forecasts of 21-day-ahead RV have overlapping target
-windows, so consecutive errors are strongly autocorrelated. Consequences: the effective
-sample size is ~N/h, and naive standard errors overstate significance. Therefore metrics
-are reported on (a) all forecasts and (b) a non-overlapping subsample (every h-th day), and
-pairwise comparisons use a Diebold–Mariano test with Newey–West (HAC) variance with
-h−1 lags. No model is assumed to win; results are reported as they come out.
+**Evaluation (test window only).** MAE, RMSE, bias (forecast − realised), QLIKE
+(y²/f² − ln(y²/f²) − 1; robust to noise in realised volatility and the preferred loss for
+volatility forecasts), directional accuracy, and 10–90 % interval coverage and width.
+- *Directional accuracy:* share of dates where sign(f − c) = sign(y − c), with c the trailing
+  21-day realised vol at t. For the 20-day historical forecast f ≈ c, so its directional
+  accuracy is essentially noise and should not be read as skill.
+- *Overlapping horizons:* daily forecasts of 21-day-ahead RV share 20 days of target, so
+  errors are strongly autocorrelated and the effective sample is ≈ N/h (≈ 24 independent
+  observations in a 2-year test window). Metrics are reported on all dates and on a
+  non-overlapping subsample (every h-th date). Pairwise comparisons use the Diebold–Mariano
+  test against GARCH under QLIKE and squared error, with a Bartlett HAC variance (h−1 lags)
+  and the Harvey–Leybourne–Newbold small-sample correction (Student-t, n−1 df).
+- No model is assumed to win. With ~24 independent observations, differences between good
+  models are usually not statistically significant, and the app says so.
 
 ---
 
-## 8. Out-of-sample protocol and backtesting *(specification — implemented in Phases 4 and 8)*
+## 8. Out-of-sample protocol and backtesting
 
-**Locked test window.** The most recent `TEST_WINDOW_DAYS` (default 504 trading days ≈ 2
-years) of the dataset are reserved as the out-of-sample test window, defined once in
-`backtest.splits`. Everything before it is the development window.
+**Locked test window** (`backtest/splits.py`). The last `TEST_WINDOW_DAYS` (504) dates on
+which the target is known form the test window; the development window ends `purge_days`
+(= h for forecasting) earlier so that no development target overlaps test-period returns.
+`assert_development_only` raises `TestDataLeakageError` if any model-selection step (GARCH
+distribution choice, LSTM scaling/training/validation/calibration) receives a date after the
+development window.
 
-- All hyper-parameters (LSTM architecture/learning rate/sequence length, GARCH
-  distribution choice, optimiser lookback, rebalancing defaults) are fixed a priori or
-  selected using development data only (with the train/validation split inside the
-  development window).
-- The test window is evaluated once per configuration; its results are never fed back into
-  a choice. Code enforces this: model-selection functions refuse inputs that overlap the
-  test window.
-- Walk-forward strategy backtest: at each rebalancing date, weights are estimated from the
-  preceding lookback window only (default 252 days), applied from the next day, and drift
-  until the next rebalance. Turnover = ½ Σ |w_new − w_drifted| (one-way); transaction cost
-  = turnover × cost (default 10 bps). Reported: annualised return, volatility, Sharpe,
-  max drawdown, turnover, cost drag — versus equal-weight.
+- All hyper-parameters are fixed a priori (LSTM) or chosen on development data (GARCH
+  distribution). Nothing observed in the test window is used to change any choice; results
+  are reported as obtained, even when unfavourable.
+- Strategy backtest *(specification — implemented in Phase 8)*: at each rebalancing date,
+  weights are estimated from the preceding lookback window only (default 252 days), applied
+  from the next day, and drift until the next rebalance. Turnover = ½ Σ |w_new − w_drifted|
+  (one-way); transaction cost = turnover × cost (default 10 bps). Reported: annualised return,
+  volatility, Sharpe, max drawdown, turnover, cost drag — versus equal-weight, separately for
+  the development and the locked test window.
 - Survivorship bias cannot be removed with this data source and is stated.
 - No claim of market-beating performance is made.
 
