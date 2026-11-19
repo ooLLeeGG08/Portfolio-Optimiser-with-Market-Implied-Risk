@@ -1,0 +1,17 @@
+# Top-level dependencies. requirements.txt is the pinned lock generated from this file:
+#   uv pip compile requirements.in -o requirements.txt --python-version 3.12
+numpy
+pandas
+scipy
+scikit-learn
+statsmodels
+PyPortfolioOpt
+arch
+torch
+yfinance
+pyarrow
+streamlit
+plotly
+matplotlib
+reportlab
+pytest

@@ -1,0 +1,14 @@
+[project]
+name = "portfolio-intelligence"
+version = "0.1.0"
+description = "Portfolio optimisation, risk analytics, volatility forecasting and market-implied volatility analysis."
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+markers = [
+    "network: tests that call the live market-data source (deselected by default; run with -m network)",
+]
+addopts = "-m 'not network'"
+filterwarnings = ["ignore::DeprecationWarning:yfinance.*"]
