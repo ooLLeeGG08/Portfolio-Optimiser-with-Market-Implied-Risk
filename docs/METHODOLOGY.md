@@ -336,10 +336,13 @@ development window.
 - All hyper-parameters are fixed a priori (LSTM) or chosen on development data (GARCH
   distribution). Nothing observed in the test window is used to change any choice; results
   are reported as obtained, even when unfavourable.
-- Strategy backtest *(specification — implemented in Phase 8)*: at each rebalancing date,
+- Strategy backtest (`backtest/walk_forward.py`): at each rebalancing date,
   weights are estimated from the preceding lookback window only (default 252 days), applied
   from the next day, and drift until the next rebalance. Turnover = ½ Σ |w_new − w_drifted|
-  (one-way); transaction cost = turnover × cost (default 10 bps). Reported: annualised return,
+  (one-way); transaction cost = cost rate × Σ |w_new − w_drifted| (total traded notional, i.e.
+  2 × one-way turnover; default 10 bps), deducted at the rebalance; the initial allocation is
+  not charged. Maximum Sharpe falls back to minimum variance (counted and reported) when no
+  asset's estimated return exceeds the risk-free rate. Reported: annualised return,
   volatility, Sharpe, max drawdown, turnover, cost drag — versus equal-weight, separately for
   the development and the locked test window.
 - Survivorship bias cannot be removed with this data source and is stated.

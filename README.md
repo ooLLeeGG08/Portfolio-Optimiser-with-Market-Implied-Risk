@@ -31,3 +31,13 @@ cached in `.cache/` (12-hour freshness). Missing data is never filled or fabrica
 problems are reported in a data-quality report and affected assets are excluded explicitly.
 
 *Not investment advice.*
+
+## Run the app
+
+```bash
+.venv/bin/streamlit run app.py
+```
+
+Then open http://localhost:8501. Volatility forecasts (GARCH + one LSTM per asset) are computed on
+demand from the Volatility Forecasting page and take about 2 minutes for 7 assets; option chains
+take ~25 seconds on first load. Both are cached for the rest of the day.

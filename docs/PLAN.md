@@ -105,6 +105,6 @@ docs/                       PLAN.md, METHODOLOGY.md
 - [x] Phase 3 — risk metrics, VaR/CVaR, risk contributions, D·R·D, stress tests
 - [x] Phase 4 — historical, GARCH and LSTM volatility forecasting with intervals and OOS evaluation
 - [x] Phase 5 — VIX, option-chain IV, IV proxy, implied-vs-forecast comparison, Volatility Disagreement Indicator
-- [ ] Phase 6
+- [x] Phase 6 — Streamlit app (9 sections incl. dashboard), walk-forward backtest (pulled forward from Phase 8), dark/orange visual design from user references
 - [ ] Phase 7
 - [ ] Phase 8

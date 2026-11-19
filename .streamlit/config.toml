@@ -1,0 +1,35 @@
+[theme]
+base = "dark"
+primaryColor = "#FF6A1A"
+backgroundColor = "#0B0B0C"
+secondaryBackgroundColor = "#141415"
+textColor = "#F2F2F2"
+borderColor = "#2A2A2D"
+dataframeBorderColor = "#232326"
+dataframeHeaderBackgroundColor = "#161617"
+font = "Manrope:https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&display=swap"
+headingFont = "Unbounded:https://fonts.googleapis.com/css2?family=Unbounded:wght@400;500;600&display=swap"
+headingFontWeights = 500
+baseRadius = "large"
+buttonRadius = "full"
+showWidgetBorder = true
+linkColor = "#FF8A3D"
+linkUnderline = false
+# Neutral info boxes so blue does not compete with the orange accent.
+blueColor = "#B8B8BE"
+blueBackgroundColor = "#18181A"
+blueTextColor = "#D9D9DE"
+orangeColor = "#FF6A1A"
+
+[theme.sidebar]
+backgroundColor = "#101011"
+secondaryBackgroundColor = "#18181A"
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "viewer"
