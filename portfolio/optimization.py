@@ -121,9 +121,10 @@ class Constraints:
 
 @dataclass(frozen=True)
 class PortfolioStats:
-    expected_return: float  # annualised arithmetic
+    expected_return: float  # annualised arithmetic, TOTAL return (not excess)
     volatility: float  # annualised
-    sharpe: float
+    sharpe: float  # excess_return / volatility
+    excess_return: float  # expected_return - risk-free rate
 
 
 def portfolio_stats(weights: pd.Series, inputs: OptimizationInputs) -> PortfolioStats:
@@ -133,7 +134,7 @@ def portfolio_stats(weights: pd.Series, inputs: OptimizationInputs) -> Portfolio
     ret = float(w @ mu)
     vol = float(np.sqrt(max(w @ cov @ w, 0.0)))
     sharpe = (ret - inputs.risk_free_rate) / vol if vol > 0 else float("nan")
-    return PortfolioStats(ret, vol, sharpe)
+    return PortfolioStats(ret, vol, sharpe, ret - inputs.risk_free_rate)
 
 
 class Strategy(str, Enum):
@@ -308,6 +309,7 @@ def compare_strategies(inputs: OptimizationInputs, constraints: Constraints = Co
 
 def comparison_table(results: list[OptimizedPortfolio]) -> pd.DataFrame:
     rows = {r.strategy.value: {"Expected return (ann.)": r.stats.expected_return,
+                               "Excess return over risk-free (ann.)": r.stats.excess_return,
                                "Volatility (ann.)": r.stats.volatility,
                                "Sharpe ratio": r.stats.sharpe,
                                **{f"w[{t}]": w for t, w in r.weights.items()}}

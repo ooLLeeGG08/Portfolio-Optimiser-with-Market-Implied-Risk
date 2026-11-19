@@ -116,7 +116,8 @@ min) are rejected with an explanation before any solve.
 Solved with PyPortfolioOpt (cvxpy, CLARABEL solver). Solver output is cleaned (clipped to
 bounds, dust < 1e-8 removed, renormalised) and re-verified against the bounds. All reported
 statistics are recomputed by one function (`portfolio_stats`) so every strategy is measured
-identically.
+identically. Each portfolio shows its total expected return, its **excess return**
+(expected return − r_f) and Sharpe = excess return / volatility.
 
 **Efficient frontier.** Minimum variance for a grid of target returns from the
 minimum-variance portfolio's return to the maximum feasible return under the bounds (an

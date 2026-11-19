@@ -125,7 +125,8 @@ def test_portfolio_stats_hand_calculation(inputs):
     S = inputs.cov.matrix.to_numpy()
     assert s.expected_return == pytest.approx(0.0975)
     assert s.volatility == pytest.approx(np.sqrt(w @ S @ w))
-    assert s.sharpe == pytest.approx((0.0975 - 0.02) / s.volatility)
+    assert s.excess_return == pytest.approx(0.0975 - 0.02)
+    assert s.sharpe == pytest.approx(s.excess_return / s.volatility)
 
 
 # --- optimality against random feasible portfolios ---------------------------------------
