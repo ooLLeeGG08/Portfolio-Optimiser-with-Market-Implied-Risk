@@ -34,7 +34,9 @@ h3 {{ font-size: 0.95rem !important; font-family: {T.FONT} !important; font-weig
            padding-top: 1.4rem; border-top: 1px solid {T.BORDER}; }}
 .pi-sec .num {{ color: {T.MUTED}; font-size: 0.85rem; min-width: 2.2rem; font-variant-numeric: tabular-nums; }}
 .pi-sec .txt {{ font-family: {T.DISPLAY_FONT}; font-weight: 400; font-size: 1.15rem; text-transform: uppercase;
-                letter-spacing: 0.01em; color: {T.TEXT}; }}
+                letter-spacing: 0.01em; color: {T.TEXT}; display: flex; align-items: center; flex-wrap: wrap;
+                gap: 0.4rem 0.75rem; line-height: 1.2; }}
+.pi-sec .txt .pi-badge {{ font-family: {T.FONT}; text-transform: none; letter-spacing: 0.02em; margin: 0; }}
 .pi-sec .cap {{ color: {T.MUTED}; font-size: 0.88rem; margin-top: 0.35rem; font-family: {T.FONT}; text-transform: none; }}
 
 /* hero */
@@ -149,9 +151,9 @@ def section(bright: str, dim: str = "", caption: str = "", basis: RiskBasis | No
     the basis that applies to every figure in the section."""
     n = st.session_state.get("_pi_section", 0) + 1
     st.session_state["_pi_section"] = n
-    tag = f'&nbsp;&nbsp;{badge(basis, basis.label)}' if basis is not None else ""
-    st.markdown(f'<div class="pi-sec"><div class="num">/{n:02d}</div><div><div class="txt">{_two_tone(dim, bright)}'
-                f'<span style="vertical-align:middle;font-family:{T.FONT};text-transform:none">{tag}</span></div>'
+    tag = badge(basis, basis.label) if basis is not None else ""
+    st.markdown(f'<div class="pi-sec"><div class="num">/{n:02d}</div><div><div class="txt">'
+                f'<span>{_two_tone(dim, bright)}</span>{tag}</div>'
                 + (f'<div class="cap">{caption}</div>' if caption else "") + "</div></div>", unsafe_allow_html=True)
 
 

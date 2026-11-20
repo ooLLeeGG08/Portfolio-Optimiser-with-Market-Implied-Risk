@@ -24,15 +24,36 @@ if "draft_rows" not in st.session_state or st.session_state.get("draft_for") != 
     st.session_state["draft_version"] = st.session_state.get("draft_version", 0) + 1
 
 
+ROUNDING_TOLERANCE_PCT = 0.1  # totals this close to 100% are treated as rounding and rescaled exactly
+
+
+def _all_equal(w: pd.Series) -> bool:
+    """True if every position has the same weight (to the displayed 0.01% precision)."""
+    w = w.dropna()
+    return len(w) > 0 and float(w.max() - w.min()) < 0.011
+
+
+def _equal_rows(rows: pd.DataFrame, value: float) -> pd.DataFrame:
+    n = len(rows)
+    return rows.assign(**{"Weight (%)": 100.0 / n, "Amount ($)": value / n})
+
+
 def add_ticker(symbol: str) -> None:
     rows = st.session_state["draft_current"]
     if symbol.upper() in set(rows["Ticker"].fillna("").str.upper()):
         st.session_state["search_msg"] = f"{symbol} is already in the portfolio."
         return
-    st.session_state["draft_rows"] = pd.concat(
-        [rows, pd.DataFrame({"Ticker": [symbol], "Weight (%)": [0.0], "Amount ($)": [0.0]})], ignore_index=True)
+    was_equal = _all_equal(rows["Weight (%)"]) and rows["Weight (%)"].notna().all()
+    rows = pd.concat([rows, pd.DataFrame({"Ticker": [symbol], "Weight (%)": [0.0], "Amount ($)": [0.0]})],
+                     ignore_index=True)
+    if was_equal:
+        rows = _equal_rows(rows, s.initial_value)
+        msg = f"Added {symbol}. The portfolio was equally weighted, so all {len(rows)} assets now get {100 / len(rows):.2f}%."
+    else:
+        msg = f"Added {symbol}. Set its weight or amount below."
+    st.session_state["draft_rows"] = rows
     st.session_state["draft_version"] += 1
-    st.session_state["search_msg"] = f"Added {symbol}. Set its weight or amount below."
+    st.session_state["search_msg"] = msg
 
 
 ui.section("assets", "Find")
@@ -59,7 +80,18 @@ table = st.data_editor(st.session_state["draft_rows"], num_rows="dynamic", width
                                       "Amount ($)": st.column_config.NumberColumn(min_value=0.0, format="dollar")})
 st.session_state["draft_current"] = table
 
-ROUNDING_TOLERANCE_PCT = 0.1  # totals this close to 100% are treated as rounding and rescaled exactly
+# An equally weighted portfolio stays equally weighted when an asset is removed or added in the table.
+w_col = table["Weight (%)"]
+if (mode.startswith("Weights") and len(table) > 0 and w_col.notna().all() and _all_equal(w_col)
+        and abs(float(w_col.sum()) - 100) > ROUNDING_TOLERANCE_PCT):
+    st.session_state["draft_rows"] = _equal_rows(table, s.initial_value)
+    st.session_state["draft_version"] += 1
+    st.session_state["table_msg"] = (f"The weights were all equal, so they were re-spread evenly: "
+                                      f"{100 / len(table):.2f}% each for {len(table)} assets.")
+    st.rerun()
+
+if st.session_state.get("table_msg"):
+    st.info(st.session_state.pop("table_msg"), icon=":material/balance:")
 col_total = "Weight (%)" if mode.startswith("Weights") else "Amount ($)"
 total = float(table[col_total].fillna(0).sum())
 if mode.startswith("Weights"):
@@ -89,13 +121,17 @@ ui.section("settings", "Analysis")
 with st.form("portfolio"):
     c = st.columns(4)
     benchmark = c[0].text_input("Benchmark", s.benchmark)
-    horizon = c[1].selectbox("Investment / risk horizon (trading days)", [5, 10, 21, 63],
-                             index=[5, 10, 21, 63].index(s.horizon_days) if s.horizon_days in (5, 10, 21, 63) else 2)
+    horizon = c[1].selectbox("Investment / risk horizon", [5, 10, 21, 63],
+                             index=[5, 10, 21, 63].index(s.horizon_days) if s.horizon_days in (5, 10, 21, 63) else 2,
+                             format_func=lambda d: {5: "5 days (1 week)", 10: "10 days (2 weeks)",
+                                                    21: "21 days (1 month)", 63: "63 days (3 months)"}[d],
+                             help="Counted in trading days (markets are open about 21 days a month).")
     rebalance = c[2].selectbox("Rebalancing", list(RebalanceFrequency),
                                index=list(RebalanceFrequency).index(s.rebalance), format_func=lambda r: r.value.title())
     years = c[3].slider("History (years)", 3, 20, s.history_years)
     c = st.columns(3)
-    auto_rf = c[0].toggle("Use latest 13-week T-bill yield as risk-free rate", s.risk_free_rate is None)
+    auto_rf = c[0].toggle("Live risk-free rate", s.risk_free_rate is None,
+                          help="On: use the latest 13-week US Treasury bill yield. Off: use the manual rate.")
     rf_pct = c[1].number_input("Manual risk-free rate (% p.a.)", -5.0, 25.0,
                                value=float((s.risk_free_rate or 0.04) * 100), step=0.25)
     initial = c[2].number_input("Portfolio value for weights mode ($)", 1000.0, 1e10, float(s.initial_value), step=1000.0)
