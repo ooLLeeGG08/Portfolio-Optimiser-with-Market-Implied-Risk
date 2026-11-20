@@ -8,6 +8,7 @@ from core.types import RebalanceFrequency, RiskBasis
 from data.data_validation import normalize_tickers
 from portfolio.portfolio import PortfolioSpec, current_allocation
 from ui import components as ui
+from ui import positions
 from ui import state
 from visualization import charts
 
@@ -15,27 +16,16 @@ ui.header("builder", "Define the portfolio. Every other section analyses this po
 s = state.settings()
 
 # --- draft positions (kept across reruns so searches and edits do not overwrite each other) ----------
+# Weights and amounts are kept in sync (ui/positions.py): edit either column and the other follows.
 if "draft_rows" not in st.session_state or st.session_state.get("draft_for") != s:
     st.session_state["draft_rows"] = pd.DataFrame({
         "Ticker": list(s.tickers),
-        "Weight (%)": [round(w * 100, 2) for w in s.weights],
-        "Amount ($)": [round(w * s.initial_value, 2) for w in s.weights]})
+        "Weight (%)": [w * 100 for w in s.weights],
+        "Amount ($)": [w * s.initial_value for w in s.weights]})
     st.session_state["draft_for"] = s
     st.session_state["draft_version"] = st.session_state.get("draft_version", 0) + 1
 
-
 ROUNDING_TOLERANCE_PCT = 0.1  # totals this close to 100% are treated as rounding and rescaled exactly
-
-
-def _all_equal(w: pd.Series) -> bool:
-    """True if every position has the same weight (to the displayed 0.01% precision)."""
-    w = w.dropna()
-    return len(w) > 0 and float(w.max() - w.min()) < 0.011
-
-
-def _equal_rows(rows: pd.DataFrame, value: float) -> pd.DataFrame:
-    n = len(rows)
-    return rows.assign(**{"Weight (%)": 100.0 / n, "Amount ($)": value / n})
 
 
 def add_ticker(symbol: str) -> None:
@@ -43,17 +33,8 @@ def add_ticker(symbol: str) -> None:
     if symbol.upper() in set(rows["Ticker"].fillna("").str.upper()):
         st.session_state["search_msg"] = f"{symbol} is already in the portfolio."
         return
-    was_equal = _all_equal(rows["Weight (%)"]) and rows["Weight (%)"].notna().all()
-    rows = pd.concat([rows, pd.DataFrame({"Ticker": [symbol], "Weight (%)": [0.0], "Amount ($)": [0.0]})],
-                     ignore_index=True)
-    if was_equal:
-        rows = _equal_rows(rows, s.initial_value)
-        msg = f"Added {symbol}. The portfolio was equally weighted, so all {len(rows)} assets now get {100 / len(rows):.2f}%."
-    else:
-        msg = f"Added {symbol}. Set its weight or amount below."
-    st.session_state["draft_rows"] = rows
+    st.session_state["draft_rows"], st.session_state["search_msg"] = positions.add_position(rows, symbol)
     st.session_state["draft_version"] += 1
-    st.session_state["search_msg"] = msg
 
 
 ui.section("assets", "Find")
@@ -72,38 +53,30 @@ if st.session_state.get("search_msg"):
     st.caption(st.session_state.pop("search_msg"))
 
 ui.section("positions", "Portfolio")
-mode = st.radio("Specify positions by", ["Weights (%)", "Investment amounts ($)"], horizontal=True, key="pos_mode")
+st.caption("Enter a weight or a dollar amount for each asset — the other column updates automatically.")
 table = st.data_editor(st.session_state["draft_rows"], num_rows="dynamic", width="stretch", hide_index=True,
                        key=f"draft_editor_{st.session_state['draft_version']}",
                        column_config={"Ticker": st.column_config.TextColumn(required=True),
                                       "Weight (%)": st.column_config.NumberColumn(min_value=0.0, max_value=100.0, format="%.2f"),
                                       "Amount ($)": st.column_config.NumberColumn(min_value=0.0, format="dollar")})
-st.session_state["draft_current"] = table
-
-# An equally weighted portfolio stays equally weighted when an asset is removed or added in the table.
-w_col = table["Weight (%)"]
-if (mode.startswith("Weights") and len(table) > 0 and w_col.notna().all() and _all_equal(w_col)
-        and abs(float(w_col.sum()) - 100) > ROUNDING_TOLERANCE_PCT):
-    st.session_state["draft_rows"] = _equal_rows(table, s.initial_value)
+synced, sync_msg, changed = positions.sync_positions(st.session_state["draft_rows"], table)
+if changed:
+    st.session_state["draft_rows"] = synced
     st.session_state["draft_version"] += 1
-    st.session_state["table_msg"] = (f"The weights were all equal, so they were re-spread evenly: "
-                                      f"{100 / len(table):.2f}% each for {len(table)} assets.")
+    if sync_msg:
+        st.session_state["table_msg"] = sync_msg
     st.rerun()
+st.session_state["draft_current"] = table
 
 if st.session_state.get("table_msg"):
     st.info(st.session_state.pop("table_msg"), icon=":material/balance:")
-col_total = "Weight (%)" if mode.startswith("Weights") else "Amount ($)"
-total = float(table[col_total].fillna(0).sum())
-if mode.startswith("Weights"):
-    gap = abs(total - 100)
-    if gap < 1e-9:
-        st.caption("Weights sum to 100%.")
-    elif gap <= ROUNDING_TOLERANCE_PCT:
-        st.caption(f"Weights sum to {total:.2f}% (rounding); they will be rescaled to exactly 100% when applied.")
-    else:
-        st.warning(f"Weights sum to {total:.2f}% — they must sum to 100% (±{ROUNDING_TOLERANCE_PCT}) before applying.")
+w_total = float(table["Weight (%)"].fillna(0).sum())
+a_total = float(table["Amount ($)"].fillna(0).sum())
+gap = abs(w_total - 100)
+if gap <= ROUNDING_TOLERANCE_PCT:
+    st.caption(f"Portfolio value ${a_total:,.2f} · weights sum to 100%.")
 else:
-    st.caption(f"Total invested: ${total:,.2f}. Weights are the amounts divided by the total.")
+    st.warning(f"Weights sum to {w_total:.2f}% — they must sum to 100% (±{ROUNDING_TOLERANCE_PCT}) before applying.")
 
 entered = [t for t in table["Ticker"].fillna("").str.strip().str.upper() if t]
 if entered:
@@ -129,12 +102,11 @@ with st.form("portfolio"):
     rebalance = c[2].selectbox("Rebalancing", list(RebalanceFrequency),
                                index=list(RebalanceFrequency).index(s.rebalance), format_func=lambda r: r.value.title())
     years = c[3].slider("History (years)", 3, 20, s.history_years)
-    c = st.columns(3, vertical_alignment="bottom")
+    c = st.columns([1, 1, 2], vertical_alignment="bottom")
     auto_rf = c[0].toggle("Live risk-free rate", s.risk_free_rate is None,
                           help="On: use the latest 13-week US Treasury bill yield. Off: use the manual rate.")
     rf_pct = c[1].number_input("Manual risk-free rate (% p.a.)", -5.0, 25.0,
                                value=float((s.risk_free_rate or 0.04) * 100), step=0.25)
-    initial = c[2].number_input("Portfolio value for weights mode ($)", 1000.0, 1e10, float(s.initial_value), step=1000.0)
     submitted = st.form_submit_button("Apply portfolio", type="primary")
 
 if submitted:
@@ -146,16 +118,15 @@ if submitted:
             st.stop()
         t = table.assign(Ticker=table["Ticker"].fillna("").str.strip().str.upper())
         t = t[t.Ticker.isin(tickers)].drop_duplicates("Ticker")
-        if mode.startswith("Weights"):
-            w = t["Weight (%)"].fillna(0).astype(float)
-            if (w < 0).any():
-                raise ValueError("Weights cannot be negative (short positions are not supported).")
-            if abs(w.sum() - 100) > ROUNDING_TOLERANCE_PCT:
-                raise ValueError(f"Weights sum to {w.sum():.2f}%; they must sum to 100% "
-                                 f"(within ±{ROUNDING_TOLERANCE_PCT} percentage points of rounding).")
-            spec = PortfolioSpec.from_weights(dict(zip(t.Ticker, w / w.sum())), initial_value=initial)
-        else:
-            spec = PortfolioSpec.from_amounts(dict(zip(t.Ticker, t["Amount ($)"].fillna(0))))
+        w = t["Weight (%)"].fillna(0).astype(float)
+        if (w < 0).any():
+            raise ValueError("Weights cannot be negative (short positions are not supported).")
+        if abs(w.sum() - 100) > ROUNDING_TOLERANCE_PCT:
+            raise ValueError(f"Weights sum to {w.sum():.2f}%; they must sum to 100% "
+                             f"(within ±{ROUNDING_TOLERANCE_PCT} percentage points of rounding).")
+        value = float(t["Amount ($)"].fillna(0).sum())
+        spec = PortfolioSpec.from_weights(dict(zip(t.Ticker, w / w.sum())),
+                                          initial_value=value if value > 0 else s.initial_value)
         bench, brep = normalize_tickers([benchmark])
         if not bench:
             st.error("Enter a valid benchmark ticker.")
