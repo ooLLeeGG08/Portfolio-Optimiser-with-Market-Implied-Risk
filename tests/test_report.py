@@ -60,6 +60,9 @@ class FakeProvider(MarketDataProvider):
     def fetch_history(self, tickers):
         return {t: self.data.get(t, pd.Series(dtype=float, name=t)) for t in tickers}
 
+    def fetch_currency(self, ticker):
+        return "USD"
+
     def fetch_option_chain(self, ticker, max_days=400):
         return _chain(float(self.data[ticker].iloc[-1])) if ticker == "AAA" else None
 

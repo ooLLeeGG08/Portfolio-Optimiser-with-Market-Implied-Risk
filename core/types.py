@@ -117,6 +117,8 @@ class SeriesProvenance:
     first_date: pd.Timestamp | None
     last_date: pd.Timestamp | None
     from_cache: bool
+    currency: str | None = None  # currency the provider quotes the price in (e.g. "JPY", "GBp")
+    fx_ticker: str | None = None  # FX series used to convert to the base currency, if any
 
 
 @dataclass

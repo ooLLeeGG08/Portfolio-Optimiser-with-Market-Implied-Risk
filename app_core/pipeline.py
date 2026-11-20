@@ -105,6 +105,12 @@ class MarketBundle:
         return self.asset_prices.index[-1]
 
     @property
+    def foreign_assets(self) -> dict[str, str]:
+        """Portfolio assets converted from another currency: ticker -> FX series used."""
+        return {t: p.fx_ticker for t, p in self.price_data.provenance.items()
+                if p.fx_ticker and t in self.spec.tickers}
+
+    @property
     def asset_returns(self) -> pd.DataFrame:
         return cv.simple_returns(self.asset_prices)
 

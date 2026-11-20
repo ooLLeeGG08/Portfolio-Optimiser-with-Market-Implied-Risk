@@ -18,6 +18,10 @@ DEFAULT_BENCHMARK = "SPY"
 DEFAULT_HISTORY_YEARS = 10
 DEFAULT_INITIAL_VALUE = 100_000.0
 
+# --- Currency -------------------------------------------------------------------
+# All prices are converted to this currency (unhedged), see METHODOLOGY §2.
+BASE_CURRENCY = "USD"
+
 # --- Market reference series -----------------------------------------------------
 VIX_TICKER = "^VIX"
 RISK_FREE_TICKER = "^IRX"  # 13-week T-bill yield, quoted in percent

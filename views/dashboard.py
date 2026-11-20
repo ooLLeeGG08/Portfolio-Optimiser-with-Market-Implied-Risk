@@ -1,5 +1,7 @@
 import streamlit as st
 
+import config
+
 from core.types import IVSource, RiskBasis
 from ui import components as ui
 from ui import state
@@ -11,7 +13,9 @@ s = mb.settings
 
 ui.hero(
     "risk & volatility", "Portfolio",
-    f"A {len(mb.spec.tickers)}-asset portfolio measured against {s.benchmark}. Prices to {mb.as_of:%d %b %Y}; "
+    f"A {len(mb.spec.tickers)}-asset portfolio measured against {s.benchmark}, valued in {config.BASE_CURRENCY}"
+    + (" (foreign listings converted, unhedged)" if mb.foreign_assets else "")
+    + f". Prices to {mb.as_of:%d %b %Y}; "
     f"risk-free rate {ui.pct(mb.risk_free_rate, 2)} ({mb.risk_free_source}).",
     [(ui.money(pa.current_value), "portfolio value", True),
      (ui.pct(pa.risk.annualized_volatility), "volatility, observed", False),

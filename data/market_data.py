@@ -9,10 +9,12 @@ No missing values are ever fabricated: failures surface in the DataQualityReport
 
 from __future__ import annotations
 
+import json
 import logging
+import re
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, time, timezone
 from zoneinfo import ZoneInfo
 
@@ -21,6 +23,7 @@ import pandas as pd
 import config
 from core.types import DataQualityReport, PriceData, SeriesProvenance, Severity
 from data.cache import CacheEntry, PriceCache
+from data.currency import convert_series, fx_candidates, normalize_currency
 from data.data_validation import normalize_tickers, validate_price_series
 from data.preprocessing import align_prices
 
@@ -67,6 +70,11 @@ class MarketDataProvider(ABC):
         """Listed option quotes for expiries within ``max_days`` calendar days, or None if
         the provider has no option data for the ticker. Providers without option data
         keep this default."""
+        return None
+
+    def fetch_currency(self, ticker: str) -> str | None:
+        """Currency code the provider quotes the ticker's prices in (e.g. 'USD', 'JPY',
+        'GBp'), or None if unknown."""
         return None
 
 
@@ -120,6 +128,13 @@ class YFinanceProvider(MarketDataProvider):
                 out[t] = empty_series(t)
         return out
 
+
+    def fetch_currency(self, ticker: str) -> str | None:
+        try:
+            cur = self._yf.Ticker(ticker).fast_info["currency"]
+        except Exception:
+            return None
+        return str(cur) if cur else None
 
     def fetch_option_chain(self, ticker: str, max_days: int = 400) -> OptionChainRaw | None:
         try:
@@ -183,6 +198,74 @@ class MarketDataService:
         self.provider = provider or YFinanceProvider()
         self.cache = cache or PriceCache(config.CACHE_DIR)
         self.cache_ttl_hours = cache_ttl_hours
+        self._currency_file = self.cache.directory / "currencies.json"
+
+    # -- currencies ----------------------------------------------------------------------
+    def get_currency(self, ticker: str) -> str | None:
+        """Quote currency for a ticker, cached on disk (it practically never changes)."""
+        try:
+            known = json.loads(self._currency_file.read_text()) if self._currency_file.exists() else {}
+        except (OSError, ValueError):
+            known = {}
+        if ticker in known:
+            return known[ticker]
+        cur = self.provider.fetch_currency(ticker)
+        if cur:
+            known[ticker] = cur
+            self._currency_file.write_text(json.dumps(known, indent=2, sort_keys=True))
+        return cur
+
+    def _fx_series(self, iso: str, base: str, refresh: bool,
+                   report: DataQualityReport) -> tuple[pd.Series | None, str | None]:
+        """Base-currency units per unit of ``iso``, from the first available FX ticker."""
+        for fx_ticker, invert in fx_candidates(iso, base):
+            loaded = self._load([fx_ticker], refresh, DataQualityReport())
+            s = loaded[fx_ticker][0]
+            if not s.empty and (s > 0).all():
+                return (1.0 / s if invert else s).rename(f"{iso}->{base}"), fx_ticker
+        return None, None
+
+    def _to_base_currency(self, loaded: dict, base: str, refresh: bool,
+                          report: DataQualityReport) -> dict:
+        """Convert every non-empty series in ``loaded`` into the base currency (unhedged)."""
+        out = {}
+        for t, (s, prov) in loaded.items():
+            if s.empty:
+                out[t] = (s, prov)
+                continue
+            cur = self.get_currency(t)
+            if cur is None:
+                if re.search(r"\.[A-Z]{1,4}$", t):
+                    report.add(t, Severity.ERROR, "CURRENCY_UNKNOWN",
+                               f"{t}: the quote currency could not be determined, so its prices cannot be "
+                               f"converted to {base}; excluded.")
+                    out[t] = (empty_series(t), prov)
+                    continue
+                report.add(t, Severity.WARNING, "CURRENCY_ASSUMED",
+                           f"{t}: quote currency unknown; prices are assumed to be in {base}.")
+                out[t] = (s, replace(prov, currency=f"{base} (assumed)"))
+                continue
+            iso, _ = normalize_currency(cur)
+            fx, fx_ticker = (None, None) if iso == base else self._fx_series(iso, base, refresh, report)
+            try:
+                conv = convert_series(s, cur, base, fx, fx_ticker)
+            except ValueError as exc:
+                report.add(t, Severity.ERROR, "FX_UNAVAILABLE", f"{t}: priced in {iso}; {exc} Excluded.")
+                out[t] = (empty_series(t), replace(prov, currency=cur))
+                continue
+            if conv.fx_ticker or conv.divisor != 1.0:
+                how = []
+                if conv.divisor != 1.0:
+                    how.append(f"quoted in {cur} (1/{conv.divisor:g} {iso})")
+                if conv.fx_ticker:
+                    how.append(f"converted {iso}→{base} with daily rates from {conv.fx_ticker}"
+                               + (" (inverted)" if conv.fx_ticker.startswith(base) else ""))
+                msg = f"{t}: " + "; ".join(how) + " — unhedged, so returns include exchange-rate moves."
+                if conv.dates_dropped:
+                    msg += f" {conv.dates_dropped} date(s) without an exchange rate were dropped (not filled)."
+                report.add(t, Severity.INFO, "CURRENCY_CONVERTED", msg)
+            out[t] = (conv.series, replace(prov, currency=cur, fx_ticker=conv.fx_ticker))
+        return out
 
     # -- raw retrieval with cache --------------------------------------------------
     def _load(self, tickers: list[str], refresh: bool,
@@ -243,8 +326,10 @@ class MarketDataService:
     # -- public API ----------------------------------------------------------------
     def get_price_data(self, tickers: Iterable[str], start: str | pd.Timestamp | None = None,
                        end: str | pd.Timestamp | None = None, refresh: bool = False,
-                       min_observations: int = config.MIN_OBSERVATIONS) -> PriceData:
-        """Validated, aligned adjusted close prices for ``tickers`` within [start, end].
+                       min_observations: int = config.MIN_OBSERVATIONS,
+                       base_currency: str = config.BASE_CURRENCY) -> PriceData:
+        """Validated, aligned adjusted close prices for ``tickers`` within [start, end],
+        converted into ``base_currency`` (unhedged).
 
         Assets failing validation are excluded and listed in ``quality.errors``.
         """
@@ -253,8 +338,12 @@ class MarketDataService:
             report.add(None, Severity.ERROR, "NO_VALID_TICKERS", "No valid ticker symbols entered.")
             return PriceData(pd.DataFrame(), {}, report)
 
-        loaded = self._load(clean, refresh, report)
-        windowed = {t: _slice(s, start, end) for t, (s, _) in loaded.items()}
+        raw = self._load(clean, refresh, report)
+        # Slice to the analysis window before converting, so any dates dropped for lack of an
+        # exchange rate are counted within the window the user asked for.
+        sliced = {t: (_slice(s, start, end), prov) for t, (s, prov) in raw.items()}
+        loaded = self._to_base_currency(sliced, base_currency, refresh, report)
+        windowed = {t: s for t, (s, _) in loaded.items()}
         provenance = {t: p for t, (_, p) in loaded.items()}
 
         # A ticker already reported as unavailable must not also be reported as NO_DATA.

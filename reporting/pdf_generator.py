@@ -23,6 +23,7 @@ from reportlab.pdfgen import canvas as rl_canvas
 from reportlab.platypus import (CondPageBreak, Image, PageBreak, Paragraph,
                                 SimpleDocTemplate, Spacer, Table, TableStyle)
 
+import config
 from app_core.pipeline import ReportData
 from core.types import IVSource, RiskBasis
 from implied_volatility.comparison import VDI_DISCLAIMER
@@ -218,6 +219,9 @@ def cover(rd: ReportData) -> list:
         ["Price data", f"{date(q.aligned_start)} – {date(mb.as_of)} ({q.n_aligned_observations:,} trading days); "
                        f"downloaded {min(fetched):%d %b %Y %H:%M}–{max(fetched):%H:%M} UTC" if fetched else "—"],
         ["Data source", E(next(iter(mb.price_data.provenance.values())).source) if mb.price_data.provenance else "—"],
+        ["Currency", f"All values in {config.BASE_CURRENCY}"
+                     + ("; converted unhedged: " + ", ".join(f"{E(t)} via {E(fx)}" for t, fx in mb.foreign_assets.items())
+                        if mb.foreign_assets else "; all assets quoted in " + config.BASE_CURRENCY)],
         ["Risk-free rate", f"{pct(mb.risk_free_rate, 2)} — {E(mb.risk_free_source)}"],
         ["VIX observation", f"{pct(mb.vix.iloc[-1])} on {date(mb.vix.index[-1])}" if mb.vix is not None else "unavailable"],
         ["Option quotes", (", ".join(sorted({f"{pd.Timestamp(c.quote_time):%d %b %Y %H:%M} UTC" for c in rd.ib.chains.values()}))
@@ -604,7 +608,8 @@ def methodology(rd: ReportData) -> list:
         "<b>Conventions.</b> 252 trading days per year; volatility annualised by √252 and mean returns by ×252 (arithmetic). "
         "Simple returns aggregate across assets; log returns are used for volatility modelling. Losses are positive numbers.",
         f"<b>Data.</b> Split- and dividend-adjusted daily closes; assets aligned on common trading dates with no filling of "
-        f"missing prices; bars for an unfinished trading day are excluded. History: {s.history_years} years "
+        f"missing prices; bars for an unfinished trading day are excluded. Prices quoted in other currencies are "
+        f"converted to {config.BASE_CURRENCY} with daily exchange rates (unhedged). History: {s.history_years} years "
         f"({s.forecast_history_years} years for volatility models).",
         "<b>Optimisation.</b> Ledoit–Wolf covariance; arithmetic mean returns; long-only, fully invested; maximum Sharpe "
         "(excess return / volatility), minimum variance, custom bounds, efficient frontier via minimum variance at target returns.",
@@ -642,10 +647,12 @@ def limitations(rd: ReportData) -> list:
         out.append(P("No price-data problems were detected for the selected assets and window."))
     out.append(P(f"Aligned sample {date(q.aligned_start)} – {date(q.aligned_end)}: {q.n_aligned_observations:,} trading "
                  f"days; {q.rows_dropped_in_alignment} date(s) dropped because at least one asset had no price (never filled)."))
-    prov = [[t, E(p.source), f"{p.fetched_at:%Y-%m-%d %H:%M} UTC", date(p.first_date), date(p.last_date)]
+    prov = [[t, E(p.source), f"{p.fetched_at:%Y-%m-%d %H:%M} UTC", date(p.first_date), date(p.last_date),
+             E(p.currency or "—") + (f" → {config.BASE_CURRENCY} ({E(p.fx_ticker)})" if p.fx_ticker else "")]
             for t, p in mb.price_data.provenance.items()]
-    out += [P("Series provenance", "h2"), table(prov, ["Series", "Source", "Downloaded", "First observation", "Last observation"],
-                                                [0.8 * inch, 1.8 * inch, 1.4 * inch, 1.1 * inch, FRAME_W - 5.1 * inch], align_right_from=9)]
+    out += [P("Series provenance", "h2"), table(prov, ["Series", "Source", "Downloaded", "First obs.", "Last obs.", "Currency"],
+                                                [0.7 * inch, 1.45 * inch, 1.25 * inch, 0.85 * inch, 0.85 * inch,
+                                                 FRAME_W - 5.1 * inch], align_right_from=9)]
     for e in mb.errors:
         out.append(P(f"<b>Note:</b> {E(e)}", "small"))
     if rd.ib is not None and rd.ib.chains:
@@ -676,6 +683,10 @@ def limitations(rd: ReportData) -> list:
             model.append(f"{n_proxy} asset(s) use an implied-volatility proxy (an estimate, not market data).")
         model.append("Option-chain implied volatilities are a snapshot at one point in time; Black-76 is a European model "
                      "applied to American options (smallest error for the out-of-the-money options used).")
+    if mb.foreign_assets:
+        model.append(f"{', '.join(mb.foreign_assets)} were converted to {config.BASE_CURRENCY} unhedged, so their figures "
+                     f"include exchange-rate risk. Exchange rates are not fixed at each exchange's closing time, which adds "
+                     f"some noise to daily returns and correlations.")
     fb_notes = [n for r in rd.bb.results.values() for n in r.notes]
     model += [E(n) for n in fb_notes]
     model += [

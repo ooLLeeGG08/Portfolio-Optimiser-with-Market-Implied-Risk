@@ -85,7 +85,7 @@ Full detail, formulas and the tests behind each: [docs/METHODOLOGY.md](docs/METH
 | Area | Approach |
 |---|---|
 | Conventions | 252 trading days; volatility ×√252; arithmetic mean ×252; losses reported as positive numbers |
-| Data | Split- and dividend-adjusted daily closes from Yahoo Finance; assets aligned on shared dates, never filled; an unfinished trading day is excluded |
+| Data | Split- and dividend-adjusted daily closes from Yahoo Finance; foreign listings converted to USD with daily exchange rates (unhedged, pence handled); assets aligned on shared dates, never filled; an unfinished trading day is excluded |
 | Covariance | Ledoit–Wolf shrinkage |
 | Optimisation | Long-only, fully invested, per-asset bounds; PyPortfolioOpt (CLARABEL); max-Sharpe sensitivity by resampling expected returns from their sampling distribution |
 | VaR / CVaR | Historical, normal, Cornish–Fisher (withheld when the expansion is invalid), Student-t Monte Carlo; √h scaling labelled |
@@ -100,6 +100,7 @@ Full detail, formulas and the tests behind each: [docs/METHODOLOGY.md](docs/METH
 
 ## Key limitations
 
+- **Long-only.** No short positions or leverage; weights must sum to 100%.
 - **Free data.** Yahoo Finance data can be delayed, revised or rate-limited; adjusted histories change
   retroactively. Delisted assets are largely missing (survivorship bias).
 - **Expected returns are imprecise.** Standard errors of several percentage points a year make
@@ -110,6 +111,9 @@ Full detail, formulas and the tests behind each: [docs/METHODOLOGY.md](docs/METH
 - **Option data is a current snapshot** with no history; Black-76 approximates American options.
 - **Conformal intervals** assume exchangeable data; when the volatility regime shifts, LSTM intervals can
   under-cover (this happens in the current data and is reported).
+- **Currencies.** Everything is valued in USD. Foreign listings (e.g. `7203.T`, `VOD.L`, `SAP.DE`) are
+  converted unhedged, so their risk includes currency moves; exchange-rate closes are not synchronised
+  with each market's close, which adds some noise to daily figures.
 - **A short-lived asset shortens everything.** The analysis uses the assets' common history; the app warns
   when one asset truncates it.
 

@@ -1,6 +1,8 @@
 import pandas as pd
 import streamlit as st
 
+import config
+
 from app_core.pipeline import AnalysisSettings
 from core.types import RebalanceFrequency, RiskBasis
 from data.data_validation import normalize_tickers
@@ -110,9 +112,12 @@ st.dataframe(stats, width="stretch", column_config=ui.pct_columns(stats, ["Mean 
 st.caption("Simple returns. Monthly figures exclude the current, incomplete month.")
 ui.chart(charts.correlation_heatmap(pa.correlation))
 
-with st.expander("Data sources and observation dates"):
+with st.expander("Data sources, currencies and observation dates"):
+    st.caption(f"All prices are in {config.BASE_CURRENCY}. Assets quoted in other currencies are converted with daily "
+               f"exchange rates, unhedged, so their returns include currency moves.")
     prov = pd.DataFrame([{"Ticker": t, "Source": p.source, "Fetched (UTC)": f"{p.fetched_at:%Y-%m-%d %H:%M}",
                           "First observation": p.first_date.date() if p.first_date is not None else None,
                           "Last observation": p.last_date.date() if p.last_date is not None else None,
+                          "Quote currency": p.currency, "Converted with": p.fx_ticker or "—",
                           "From cache": p.from_cache} for t, p in mb.price_data.provenance.items()])
     st.dataframe(prov, hide_index=True, width="stretch")

@@ -55,6 +55,27 @@ some dates; this is documented in the data-quality report.
 
 **Monthly returns** are computed from month-end aligned prices.
 
+**Currency conversion** (`data/currency.py`, applied inside `MarketDataService.get_price_data`, so
+the app, forecasts, backtests and report all receive base-currency prices). All prices are
+expressed in the base currency, USD (`config.BASE_CURRENCY`):
+- The quote currency of each ticker comes from the provider and is cached. Minor units are
+  normalised first: London prices quoted in pence (`GBp`/`GBX`) are divided by 100, likewise
+  `ZAc` and `ILA`.
+- Conversion is **unhedged**: P_USD,t = P_local,t × X_t, with X_t = USD per unit of local
+  currency. The USD-quoted pair (e.g. `USDJPY=X`) is preferred and inverted because it carries
+  more significant digits; the direct pair (`JPYUSD=X`) is the fallback. USD returns therefore
+  equal (1 + local return)(1 + currency return) − 1, i.e. they include exchange-rate risk, as
+  for an investor who holds the foreign asset and measures wealth in USD.
+- Prices are cut to the analysis window first; dates inside it with a price but no exchange
+  rate are dropped, never filled, and counted in the data-quality report.
+- Unknown currency: a ticker with an exchange suffix (e.g. `.T`, `.L`) is excluded rather than
+  guessed; a US-style symbol is assumed to be in USD, with a warning.
+- Every conversion (currency, FX series, dropped dates) is listed in the data-quality report,
+  the provenance table and the PDF.
+- Limitation: FX daily closes are not taken at each exchange's closing time, which adds noise to
+  daily returns and slightly understates same-day correlations between markets in different
+  time zones.
+
 **Known data limitations**
 - Survivorship bias: Yahoo removes most delisted tickers, so historical universes contain
   only survivors.
