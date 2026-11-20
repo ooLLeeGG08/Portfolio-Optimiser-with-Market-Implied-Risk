@@ -36,6 +36,24 @@ def set_settings(s: pl.AnalysisSettings) -> None:
     st.session_state["settings"] = s
 
 
+# --- security search -------------------------------------------------------------------------
+
+@st.cache_data(show_spinner=False, ttl=24 * 3600, max_entries=500)
+def search(query: str):
+    try:
+        return service().search(query, 10)
+    except Exception:
+        return []
+
+
+@st.cache_data(show_spinner=False, ttl=24 * 3600, max_entries=2000)
+def lookup(ticker: str):
+    try:
+        return service().lookup(ticker)
+    except Exception:
+        return None
+
+
 # --- cached stages -------------------------------------------------------------------------
 
 @st.cache_resource(show_spinner=False, max_entries=6)

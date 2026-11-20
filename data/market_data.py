@@ -53,6 +53,28 @@ class OptionChainRaw:
     source: str
 
 
+@dataclass(frozen=True)
+class SecurityMatch:
+    """One result of a security search."""
+
+    symbol: str
+    name: str
+    exchange: str
+    quote_type: str  # EQUITY, ETF, MUTUALFUND, CRYPTOCURRENCY, INDEX
+    sector: str | None = None
+
+    @property
+    def label(self) -> str:
+        kind = {"EQUITY": "Stock", "ETF": "ETF", "MUTUALFUND": "Mutual fund",
+                "CRYPTOCURRENCY": "Crypto", "INDEX": "Index"}.get(self.quote_type, self.quote_type.title())
+        return f"{self.symbol} — {self.name} · {self.exchange} · {kind}"
+
+
+# Price series that behave like investable assets. Futures (contract rolls), options and FX
+# pairs are excluded from search results.
+SEARCHABLE_TYPES = {"EQUITY", "ETF", "MUTUALFUND", "CRYPTOCURRENCY", "INDEX"}
+
+
 class MarketDataProvider(ABC):
     name: str = "abstract"
     supports_options: bool = False
@@ -76,6 +98,10 @@ class MarketDataProvider(ABC):
         """Currency code the provider quotes the ticker's prices in (e.g. 'USD', 'JPY',
         'GBp'), or None if unknown."""
         return None
+
+    def search(self, query: str, max_results: int = 10) -> list[SecurityMatch]:
+        """Securities matching a name or symbol. Providers without search return []."""
+        return []
 
 
 def drop_incomplete_session(series: pd.Series, now: datetime | None = None) -> pd.Series:
@@ -128,6 +154,21 @@ class YFinanceProvider(MarketDataProvider):
                 out[t] = empty_series(t)
         return out
 
+
+    def search(self, query: str, max_results: int = 10) -> list[SecurityMatch]:
+        try:
+            res = self._yf.Search(query, max_results=max_results, news_count=0,
+                                  enable_fuzzy_query=False).quotes
+        except Exception as exc:
+            raise DataSourceError(f"Search failed: {exc}") from exc
+        out = []
+        for r in res:
+            sym, qt = r.get("symbol"), (r.get("quoteType") or "").upper()
+            if not sym or qt not in SEARCHABLE_TYPES:
+                continue
+            out.append(SecurityMatch(sym, (r.get("longname") or r.get("shortname") or sym).strip(),
+                                     r.get("exchDisp") or r.get("exchange") or "", qt, r.get("sectorDisp")))
+        return out
 
     def fetch_currency(self, ticker: str) -> str | None:
         try:
@@ -199,6 +240,25 @@ class MarketDataService:
         self.cache = cache or PriceCache(config.CACHE_DIR)
         self.cache_ttl_hours = cache_ttl_hours
         self._currency_file = self.cache.directory / "currencies.json"
+        self._search_cache: dict[tuple[str, int], list[SecurityMatch]] = {}
+
+    # -- search ---------------------------------------------------------------------------
+    def search(self, query: str, max_results: int = 10) -> list[SecurityMatch]:
+        q = query.strip()
+        if len(q) < 1:
+            return []
+        key = (q.lower(), max_results)
+        if key not in self._search_cache:
+            self._search_cache[key] = self.provider.search(q, max_results)
+        return self._search_cache[key]
+
+    def lookup(self, ticker: str) -> SecurityMatch | None:
+        """Exact-symbol match for a ticker, or None if the search does not know it."""
+        t = ticker.strip().upper()
+        for m in self.search(t, 10):
+            if m.symbol.upper() == t:
+                return m
+        return None
 
     # -- currencies ----------------------------------------------------------------------
     def get_currency(self, ticker: str) -> str | None:

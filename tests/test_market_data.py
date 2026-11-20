@@ -143,3 +143,53 @@ def test_live_yfinance_fetch(tmp_path):
     assert (pdata.prices > 0).all().all()
     assert len(pdata.prices) > 1000
     assert svc.latest_risk_free_rate() is not None
+
+
+# --- security search --------------------------------------------------------------------------
+
+class _FakeSearch:
+    def __init__(self, query, **kwargs):
+        self.quotes = [
+            {"symbol": "TM", "longname": "Toyota Motor Corporation", "exchDisp": "NYSE", "quoteType": "EQUITY"},
+            {"symbol": "TOY=F", "shortname": "Toyota futures", "exchDisp": "CME", "quoteType": "FUTURE"},
+            {"symbol": "7203.T", "shortname": "TOYOTA MOTOR CORP ", "exchDisp": "Tokyo", "quoteType": "EQUITY",
+             "sectorDisp": "Consumer Cyclical"},
+            {"symbol": "TOYETF", "longname": "Toy ETF", "exchange": "PCX", "quoteType": "ETF"},
+        ]
+
+
+def test_yfinance_search_filters_futures_and_maps_fields(tmp_path):
+    from data.market_data import YFinanceProvider
+    prov = YFinanceProvider(tz_cache_dir=tmp_path)
+
+    class FakeYF:
+        Search = _FakeSearch
+    prov._yf = FakeYF
+    res = prov.search("toyota")
+    assert [m.symbol for m in res] == ["TM", "7203.T", "TOYETF"]  # futures removed
+    assert res[1].name == "TOYOTA MOTOR CORP" and res[1].exchange == "Tokyo"
+    assert res[2].exchange == "PCX"
+    assert res[0].label == "TM — Toyota Motor Corporation · NYSE · Stock"
+    assert res[2].label.endswith("· ETF")
+
+
+def test_service_search_is_cached_and_lookup_is_exact(tmp_path):
+    from data.market_data import SecurityMatch
+
+    class SearchProvider(FakeProvider):
+        def __init__(self):
+            super().__init__({})
+            self.queries = []
+
+        def search(self, query, max_results=10):
+            self.queries.append(query)
+            return [SecurityMatch("TM", "Toyota", "NYSE", "EQUITY"),
+                    SecurityMatch("7203.T", "Toyota", "Tokyo", "EQUITY")]
+
+    svc = MarketDataService(SearchProvider(), PriceCache(tmp_path))
+    assert len(svc.search("Toyota")) == 2
+    svc.search("toyota ")
+    assert svc.provider.queries == ["Toyota"]  # case/whitespace-insensitive cache
+    assert svc.lookup("7203.t").exchange == "Tokyo"
+    assert svc.lookup("72") is None  # partial symbols are not accepted as matches
+    assert svc.search("   ") == []

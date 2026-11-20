@@ -52,7 +52,7 @@ about 25 seconds. Both are then reused for the rest of the day.
 | Section | Contents |
 |---|---|
 | **Dashboard** | Portfolio value, return, volatility, Sharpe, drawdown; VaR/CVaR; risk contributions; historical vs GARCH vs LSTM vs implied volatility |
-| **Portfolio Builder** | Inputs and validation, data-quality report, composition (target vs drifted weights), performance vs benchmark, daily/monthly return statistics, correlation matrix, data provenance |
+| **Portfolio Builder** | Search by company, fund or ticker (e.g. "Toyota" → `7203.T`); weights or dollar amounts; ticker check; inputs and validation, data-quality report, composition (target vs drifted weights), performance vs benchmark, daily/monthly return statistics, correlation matrix, data provenance |
 | **Portfolio Optimisation** | Equal weight, minimum variance, maximum Sharpe, custom constraints (min/max weight, target return or volatility), your own weights; efficient frontier; sensitivity of max-Sharpe weights to estimation error |
 | **Volatility Forecasting** | Rolling 20/60/252-day volatility; GARCH(1,1) and LSTM forecasts with 10–90% intervals; out-of-sample forecast chart; GARCH diagnostics; LSTM training details |
 | **Market-Implied Volatility** | VIX level, history, percentile and variance risk premium; option-chain implied volatility per asset (term structure, smile, filtered quotes); implied vs forecast comparison; Volatility Disagreement Indicator |

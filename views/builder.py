@@ -14,15 +14,79 @@ from visualization import charts
 ui.header("builder", "Define the portfolio. Every other section analyses this portfolio.", dim="Portfolio")
 s = state.settings()
 
+# --- draft positions (kept across reruns so searches and edits do not overwrite each other) ----------
+if "draft_rows" not in st.session_state or st.session_state.get("draft_for") != s:
+    st.session_state["draft_rows"] = pd.DataFrame({
+        "Ticker": list(s.tickers),
+        "Weight (%)": [round(w * 100, 2) for w in s.weights],
+        "Amount ($)": [round(w * s.initial_value, 2) for w in s.weights]})
+    st.session_state["draft_for"] = s
+    st.session_state["draft_version"] = st.session_state.get("draft_version", 0) + 1
+
+
+def add_ticker(symbol: str) -> None:
+    rows = st.session_state["draft_current"]
+    if symbol.upper() in set(rows["Ticker"].fillna("").str.upper()):
+        st.session_state["search_msg"] = f"{symbol} is already in the portfolio."
+        return
+    st.session_state["draft_rows"] = pd.concat(
+        [rows, pd.DataFrame({"Ticker": [symbol], "Weight (%)": [0.0], "Amount ($)": [0.0]})], ignore_index=True)
+    st.session_state["draft_version"] += 1
+    st.session_state["search_msg"] = f"Added {symbol}. Set its weight or amount below."
+
+
+ui.section("assets", "Find")
+c1, c2 = st.columns([2, 3])
+query = c1.text_input("Search by company, fund or ticker", placeholder="e.g. Toyota, Vanguard 500, bitcoin, VOD.L",
+                      key="search_query")
+matches = state.search(query) if query.strip() else []
+if query.strip() and not matches:
+    c2.caption("No matching stocks, ETFs, funds, indices or crypto found.")
+if matches:
+    choice = c2.selectbox(f"{len(matches)} match(es)", matches, format_func=lambda m: m.label, key="search_choice")
+    if c2.button("Add to portfolio", icon=":material/add:", key="search_add"):
+        add_ticker(choice.symbol)
+        st.rerun()
+if st.session_state.get("search_msg"):
+    st.caption(st.session_state.pop("search_msg"))
+
+ui.section("positions", "Portfolio")
+mode = st.radio("Specify positions by", ["Weights (%)", "Investment amounts ($)"], horizontal=True, key="pos_mode")
+table = st.data_editor(st.session_state["draft_rows"], num_rows="dynamic", width="stretch", hide_index=True,
+                       key=f"draft_editor_{st.session_state['draft_version']}",
+                       column_config={"Ticker": st.column_config.TextColumn(required=True),
+                                      "Weight (%)": st.column_config.NumberColumn(min_value=0.0, max_value=100.0, format="%.2f"),
+                                      "Amount ($)": st.column_config.NumberColumn(min_value=0.0, format="dollar")})
+st.session_state["draft_current"] = table
+
+ROUNDING_TOLERANCE_PCT = 0.1  # totals this close to 100% are treated as rounding and rescaled exactly
+col_total = "Weight (%)" if mode.startswith("Weights") else "Amount ($)"
+total = float(table[col_total].fillna(0).sum())
+if mode.startswith("Weights"):
+    gap = abs(total - 100)
+    if gap < 1e-9:
+        st.caption("Weights sum to 100%.")
+    elif gap <= ROUNDING_TOLERANCE_PCT:
+        st.caption(f"Weights sum to {total:.2f}% (rounding); they will be rescaled to exactly 100% when applied.")
+    else:
+        st.warning(f"Weights sum to {total:.2f}% — they must sum to 100% (±{ROUNDING_TOLERANCE_PCT}) before applying.")
+else:
+    st.caption(f"Total invested: ${total:,.2f}. Weights are the amounts divided by the total.")
+
+entered = [t for t in table["Ticker"].fillna("").str.strip().str.upper() if t]
+if entered:
+    checks = []
+    for t in dict.fromkeys(entered):
+        m = state.lookup(t)
+        checks.append(f"✓ **{t}** — {m.name} · {m.exchange}" if m else
+                      f"⚠ **{t}** — not found by search; it will still be checked against price data when applied")
+    with st.expander(f"Ticker check ({sum(c.startswith('✓') for c in checks)} of {len(checks)} recognised)",
+                     expanded=any(c.startswith("⚠") for c in checks)):
+        for c in checks:
+            st.markdown(c)
+
+ui.section("settings", "Analysis")
 with st.form("portfolio"):
-    mode = st.radio("Specify positions by", ["Weights (%)", "Investment amounts ($)"], horizontal=True)
-    default = pd.DataFrame({"Ticker": list(s.tickers),
-                            "Weight (%)": [round(w * 100, 2) for w in s.weights],
-                            "Amount ($)": [round(w * s.initial_value, 2) for w in s.weights]})
-    table = st.data_editor(default, num_rows="dynamic", width="stretch", hide_index=True,
-                           column_config={"Ticker": st.column_config.TextColumn(required=True),
-                                          "Weight (%)": st.column_config.NumberColumn(min_value=0.0, max_value=100.0, format="%.2f"),
-                                          "Amount ($)": st.column_config.NumberColumn(min_value=0.0, format="%.2f")})
     c = st.columns(4)
     benchmark = c[0].text_input("Benchmark", s.benchmark)
     horizon = c[1].selectbox("Investment / risk horizon (trading days)", [5, 10, 21, 63],
@@ -47,8 +111,13 @@ if submitted:
         t = table.assign(Ticker=table["Ticker"].fillna("").str.strip().str.upper())
         t = t[t.Ticker.isin(tickers)].drop_duplicates("Ticker")
         if mode.startswith("Weights"):
-            spec = PortfolioSpec.from_weights(dict(zip(t.Ticker, t["Weight (%)"].fillna(0) / 100)),
-                                              initial_value=initial)
+            w = t["Weight (%)"].fillna(0).astype(float)
+            if (w < 0).any():
+                raise ValueError("Weights cannot be negative (short positions are not supported).")
+            if abs(w.sum() - 100) > ROUNDING_TOLERANCE_PCT:
+                raise ValueError(f"Weights sum to {w.sum():.2f}%; they must sum to 100% "
+                                 f"(within ±{ROUNDING_TOLERANCE_PCT} percentage points of rounding).")
+            spec = PortfolioSpec.from_weights(dict(zip(t.Ticker, w / w.sum())), initial_value=initial)
         else:
             spec = PortfolioSpec.from_amounts(dict(zip(t.Ticker, t["Amount ($)"].fillna(0))))
         bench, brep = normalize_tickers([benchmark])
@@ -60,7 +129,6 @@ if submitted:
             benchmark=bench[0], horizon_days=int(horizon),
             risk_free_rate=None if auto_rf else rf_pct / 100, rebalance=rebalance,
             initial_value=float(spec.initial_value), history_years=int(years)))
-        st.success("Portfolio updated.")
         st.rerun()
     except ValueError as exc:
         st.error(str(exc))
