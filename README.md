@@ -47,6 +47,39 @@ about 25 seconds. Both are then reused for the rest of the day.
 
 ---
 
+## Deploying to Vercel
+
+The app ships as a container image (`Dockerfile.vercel`), which Vercel detects automatically. It
+runs the Streamlit server on Linux with CPU-only PyTorch (`requirements-vercel.txt`). No
+environment variables or API keys are needed.
+
+**Deploy from GitHub (recommended)**
+1. Push the repository to GitHub.
+2. On vercel.com, choose **Add New → Project**, import the repository, leave the framework preset
+   as **Other**, and click **Deploy**. Every later push to `main` redeploys automatically.
+
+**Or with the CLI:** `vercel deploy --prod` from the project folder.
+
+**Test the exact image locally first (optional):**
+```bash
+docker build --platform linux/amd64 -f Dockerfile.vercel -t portfolio-intelligence .
+docker run --rm -p 8080:80 portfolio-intelligence    # open http://localhost:8080
+```
+
+**What to expect on Vercel (especially the free Hobby plan)**
+
+| Vercel behaviour | Effect | How the app handles it |
+|---|---|---|
+| A connection lasts at most 5 minutes (Hobby) or up to 30 minutes (Pro) | The browser reconnects, sometimes to a fresh server | The portfolio is stored in the page URL and restored automatically. The URL is also a shareable link to that portfolio |
+| Idle servers shut down after about 5 minutes | The first visit after a quiet spell takes longer while the server starts | Market data is re-downloaded and cached again |
+| Results are not kept between servers | Volatility forecasts (2–4 minutes on a cloud CPU) may need to run again | Each finished asset is cached, so if a run is cut off, clicking **Run** again resumes where it stopped |
+| 2 GB memory | The full analysis peaks at about 850 MB | Fits comfortably |
+
+Yahoo Finance sometimes rate-limits requests from cloud servers. If data fails to load, the app
+says so and you can retry after a short wait.
+
+---
+
 ## What the app does
 
 | Section | Contents |

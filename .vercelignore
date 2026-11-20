@@ -1,0 +1,15 @@
+# Files not uploaded to Vercel.
+.git
+.venv
+.cache
+.pytest_cache
+.idea
+.vercel
+**/__pycache__
+*.pyc
+*.pdf
+tests
+docs
+requirements.txt
+requirements.in
+requirements-vercel.in

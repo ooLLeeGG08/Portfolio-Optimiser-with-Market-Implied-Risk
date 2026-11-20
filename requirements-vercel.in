@@ -1,0 +1,16 @@
+# Runtime dependencies for the Vercel container (Linux, CPU-only PyTorch). Lock:
+#   uv pip compile requirements-vercel.in -o requirements-vercel.txt --python-version 3.12 --python-platform x86_64-manylinux_2_28 --torch-backend cpu --emit-index-url
+numpy
+pandas
+scipy
+scikit-learn
+statsmodels
+PyPortfolioOpt
+arch
+torch
+yfinance
+pyarrow
+streamlit
+plotly
+matplotlib
+reportlab

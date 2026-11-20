@@ -318,25 +318,38 @@ class ForecastBundle:
                                 f"{model} volatility, {self.horizon_days}-day horizon")
 
 
+def asset_volatility_study(service: MarketDataService, ticker: str, horizon: int,
+                           history_years: int) -> VolStudyResult:
+    """Forecasting study for one asset on its own long history (base currency)."""
+    start = pd.Timestamp.today().normalize() - pd.DateOffset(years=history_years)
+    pdata = service.get_price_data([ticker], start=start)
+    if pdata.prices.empty:
+        raise ValueError("; ".join(x.message for x in pdata.quality.errors))
+    return run_volatility_study(cv.log_returns(pdata.prices[ticker]), ticker, VolStudyConfig(horizon=horizon))
+
+
 def run_forecasts(mb: MarketBundle, pa: PortfolioAnalysis, service: MarketDataService,
-                  progress: Progress = _noop) -> ForecastBundle:
+                  progress: Progress = _noop,
+                  asset_study: Callable[[str], VolStudyResult] | None = None,
+                  portfolio_study: Callable[[], VolStudyResult] | None = None) -> ForecastBundle:
+    """Forecast every asset and the portfolio. ``asset_study`` / ``portfolio_study`` may be
+    supplied (e.g. cached versions) so an interrupted run can resume where it stopped."""
     h = mb.settings.horizon_days
-    cfg = VolStudyConfig(horizon=h)
+    asset_study = asset_study or (lambda t: asset_volatility_study(
+        service, t, h, mb.settings.forecast_history_years))
+    portfolio_study = portfolio_study or (lambda: run_volatility_study(
+        cv.log_returns(pa.path.values), "Portfolio", VolStudyConfig(horizon=h)))
     studies, failures = {}, {}
     tickers = list(mb.spec.tickers)
-    long_start = mb.settings.start_date(mb.settings.forecast_history_years)
     for i, t in enumerate(tickers):
         progress(i / (len(tickers) + 1), f"Forecasting {t} ({i + 1}/{len(tickers) + 1})")
         try:
-            pdata = service.get_price_data([t], start=long_start)
-            if pdata.prices.empty:
-                raise ValueError("; ".join(x.message for x in pdata.quality.errors))
-            studies[t] = run_volatility_study(cv.log_returns(pdata.prices[t]), t, cfg)
+            studies[t] = asset_study(t)
         except Exception as exc:
             failures[t] = str(exc)
     progress(len(tickers) / (len(tickers) + 1), "Forecasting the portfolio")
     try:
-        studies["Portfolio"] = run_volatility_study(cv.log_returns(pa.path.values), "Portfolio", cfg)
+        studies["Portfolio"] = portfolio_study()
     except Exception as exc:
         failures["Portfolio"] = str(exc)
     progress(1.0, "Done")

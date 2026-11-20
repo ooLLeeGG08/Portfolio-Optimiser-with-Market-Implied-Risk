@@ -1,0 +1,15 @@
+# Keep the image small and free of local state.
+.git
+.venv
+.cache
+.pytest_cache
+.idea
+.vercel
+**/__pycache__
+*.pyc
+*.pdf
+tests
+docs
+requirements.txt
+requirements.in
+requirements-vercel.in

@@ -1,6 +1,8 @@
 import pandas as pd
 import streamlit as st
 
+import config
+
 from core.types import RiskBasis
 from ui import components as ui
 from ui import state
@@ -29,6 +31,9 @@ if fb is None:
                    f"{mb.settings.forecast_history_years} years of data, then evaluates all models on a locked "
                    f"out-of-sample window. Takes about {15 * (len(mb.spec.tickers) + 1) // 60 + 1} minutes; "
                    f"results are kept for the rest of the day.")
+        if config.HOSTED:
+            st.caption("On the hosted version the connection can reset during a long run. If that happens, click "
+                       "the button again: every finished asset is kept, so the run resumes where it stopped.")
         if st.button("Run volatility forecasts", type="primary", icon=":material/play_arrow:"):
             state.run_forecasts()
             st.rerun()

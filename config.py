@@ -6,11 +6,15 @@ Financial conventions (trading days, annualisation, loss sign) live in
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-CACHE_DIR = PROJECT_ROOT / ".cache" / "market_data"
-CHECKPOINT_DIR = PROJECT_ROOT / ".cache" / "checkpoints"
+# Writable cache location; containers set PI_CACHE_DIR to a temp directory.
+CACHE_ROOT = Path(os.environ.get("PI_CACHE_DIR", PROJECT_ROOT / ".cache"))
+CACHE_DIR = CACHE_ROOT / "market_data"
+CHECKPOINT_DIR = CACHE_ROOT / "checkpoints"
+HOSTED = bool(os.environ.get("VERCEL") or os.environ.get("PI_HOSTED"))
 
 # --- Default portfolio (example only; fully editable in the app) -------------------
 DEFAULT_TICKERS: tuple[str, ...] = ("AAPL", "MSFT", "JPM", "XOM", "JNJ", "TLT", "GLD")

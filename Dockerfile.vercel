@@ -1,0 +1,29 @@
+# Container image for Vercel (detected automatically from this file name).
+# Runs the Streamlit server; Vercel routes all traffic, including the WebSocket at
+# /_stcore/stream, to the port below.
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    # Containers are stateless: keep caches in the writable temp directory.
+    PI_CACHE_DIR=/tmp/portfolio-intelligence \
+    PI_HOSTED=1 \
+    MPLCONFIGDIR=/tmp/matplotlib \
+    # The forecasting work is single-thread bound; extra threads only add memory.
+    OMP_NUM_THREADS=1 \
+    MKL_NUM_THREADS=1 \
+    STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+
+WORKDIR /app
+
+# Dependencies first so they are cached between builds. CPU-only PyTorch (no CUDA).
+COPY requirements-vercel.txt .
+RUN pip install -r requirements-vercel.txt
+
+COPY . .
+
+# Vercel sends traffic to port 80 unless PORT is set in the project settings.
+EXPOSE 80
+CMD ["sh", "-c", "exec streamlit run app.py --server.port ${PORT:-80} --server.address 0.0.0.0 --server.headless true"]

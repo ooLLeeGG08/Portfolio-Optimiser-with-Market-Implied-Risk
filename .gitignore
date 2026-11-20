@@ -1,8 +1,9 @@
-.venv/
-.cache/
 __pycache__/
-*.pyc
-.pytest_cache/
+.cache/
 .DS_Store
 .idea/
+.pytest_cache/
+.venv/
+.vercel
 *.pdf
+*.pyc

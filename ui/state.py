@@ -13,6 +13,7 @@ from datetime import date
 import streamlit as st
 
 from app_core import pipeline as pl
+from core.types import RebalanceFrequency
 from data.market_data import MarketDataService
 from portfolio.optimization import Constraints
 
@@ -26,14 +27,47 @@ def day() -> str:
     return date.today().isoformat()
 
 
+# --- portfolio settings, mirrored in the URL ----------------------------------------------------
+# The URL carries the portfolio so a reconnect to a fresh server instance (common on serverless
+# hosting) restores it, and so a portfolio can be shared as a link.
+
+def _to_query(s: pl.AnalysisSettings) -> dict[str, str]:
+    return {"t": ",".join(s.tickers), "w": ",".join(f"{w:.6f}" for w in s.weights), "b": s.benchmark,
+            "h": str(s.horizon_days), "rb": s.rebalance.value, "y": str(s.history_years),
+            "rf": "auto" if s.risk_free_rate is None else f"{s.risk_free_rate:.6f}", "v": f"{s.initial_value:.2f}"}
+
+
+def _from_query(q) -> pl.AnalysisSettings | None:
+    try:
+        tickers = tuple(x for x in q["t"].split(",") if x)
+        weights = tuple(float(x) for x in q["w"].split(","))
+        if not tickers or len(tickers) != len(weights) or len(tickers) > 100:
+            return None
+        total = sum(weights)
+        if total <= 0 or any(w < 0 for w in weights):
+            return None
+        return pl.AnalysisSettings(
+            tickers=tickers, weights=tuple(w / total for w in weights), benchmark=q.get("b", "SPY"),
+            horizon_days=int(q.get("h", 21)), rebalance=RebalanceFrequency(q.get("rb", "monthly")),
+            history_years=min(max(int(q.get("y", 10)), 3), 20),
+            risk_free_rate=None if q.get("rf", "auto") == "auto" else float(q["rf"]),
+            initial_value=float(q.get("v", 100_000)))
+    except (KeyError, ValueError):
+        return None
+
+
 def settings() -> pl.AnalysisSettings:
     if "settings" not in st.session_state:
-        st.session_state["settings"] = pl.AnalysisSettings()
-    return st.session_state["settings"]
+        st.session_state["settings"] = _from_query(st.query_params) or pl.AnalysisSettings()
+    s = st.session_state["settings"]
+    if s != pl.AnalysisSettings() or "t" in st.query_params:
+        st.query_params.from_dict(_to_query(s))
+    return s
 
 
 def set_settings(s: pl.AnalysisSettings) -> None:
     st.session_state["settings"] = s
+    st.query_params.from_dict(_to_query(s))
 
 
 # --- security search -------------------------------------------------------------------------
@@ -106,9 +140,33 @@ def backtests() -> pl.BacktestBundle:
 
 # --- slow stages (explicit stores) ---------------------------------------------------------------
 
+MAX_STORED = 6  # portfolios whose slow results are kept in server memory
+
+
+def _remember(store: dict, key, value) -> None:
+    """Insert into a bounded store, evicting the oldest entries."""
+    store.pop(key, None)
+    store[key] = value
+    while len(store) > MAX_STORED:
+        store.pop(next(iter(store)))
+
+
 @st.cache_resource(show_spinner=False)
 def _forecast_store() -> dict:
     return {}
+
+
+@st.cache_resource(show_spinner=False, max_entries=60)
+def _asset_study(ticker: str, horizon: int, history_years: int, d: str):
+    return pl.asset_volatility_study(service(), ticker, horizon, history_years)
+
+
+@st.cache_resource(show_spinner=False, max_entries=MAX_STORED)
+def _portfolio_study(s: pl.AnalysisSettings, d: str):
+    from core import conventions as cv
+    from forecasting.study import VolStudyConfig, run_volatility_study
+    return run_volatility_study(cv.log_returns(_portfolio(s, d).path.values), "Portfolio",
+                                VolStudyConfig(horizon=s.horizon_days))
 
 
 def forecasts() -> pl.ForecastBundle | None:
@@ -116,11 +174,16 @@ def forecasts() -> pl.ForecastBundle | None:
 
 
 def run_forecasts() -> pl.ForecastBundle:
+    """Each finished series is cached on its own, so an interrupted run (e.g. a dropped
+    connection on serverless hosting) resumes from where it stopped."""
     mb, pa = market(), portfolio()
+    s, d = settings(), day()
     bar = st.progress(0.0, text="Starting volatility forecasts…")
-    fb = pl.run_forecasts(mb, pa, service(), lambda p, m: bar.progress(min(p, 1.0), text=m))
+    fb = pl.run_forecasts(mb, pa, service(), lambda p, m: bar.progress(min(p, 1.0), text=m),
+                          asset_study=lambda t: _asset_study(t, s.horizon_days, s.forecast_history_years, d),
+                          portfolio_study=lambda: _portfolio_study(s, d))
     bar.empty()
-    _forecast_store()[(settings(), day())] = fb
+    _remember(_forecast_store(), (s, d), fb)
     return fb
 
 
@@ -139,7 +202,7 @@ def implied(fetch: bool = True) -> pl.ImpliedBundle | None:
             return None
         mb = market()
         bar = st.progress(0.0, text="Downloading option chains…")
-        store[key] = pl.run_implied(mb, service(), None, lambda p, m: bar.progress(min(p, 1.0), text=m))
+        _remember(store, key, pl.run_implied(mb, service(), None, lambda p, m: bar.progress(min(p, 1.0), text=m)))
         bar.empty()
     ib = store[key]
     fb = forecasts()
