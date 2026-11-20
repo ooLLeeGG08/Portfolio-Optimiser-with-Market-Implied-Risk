@@ -28,7 +28,7 @@ for e in mb.errors:
     st.warning(e, icon=":material/warning:")
 
 # --- portfolio overview -----------------------------------------------------------------------
-ui.section("overview", "Portfolio")
+ui.section("overview", "Portfolio", basis=RiskBasis.OBSERVED)
 r, perf = pa.risk, pa.performance
 c = st.columns(6)
 with c[0]:
@@ -55,7 +55,7 @@ with right:
     ui.chart(charts.allocation_donut(pa.current_weights, "Current allocation (after drift)"))
 
 # --- risk overview ----------------------------------------------------------------------------
-ui.section("overview", "Risk")
+ui.section("overview", "Risk", basis=RiskBasis.OBSERVED)
 tr = {(e.method, e.confidence): e for e in pa.tail_risk}
 h95, h99 = tr[("Historical", 0.95)], tr[("Historical", 0.99)]
 c = st.columns(4)
@@ -92,7 +92,7 @@ if fb is not None and "Portfolio" in fb.studies:
                                 help=f"Calibrated 10–90% interval {ui.pct(L.loc['LSTM', 'lower'])} – {ui.pct(L.loc['LSTM', 'upper'])}."))
 else:
     def _todo():
-        with st.container(border=True):
+        with ui.card():
             st.markdown("**GARCH and LSTM forecasts**")
             st.caption("Not yet computed (about 2 minutes).")
             st.page_link("views/forecasting.py", label="Run forecasts", icon=":material/play_arrow:")
@@ -111,7 +111,7 @@ if ib is not None:
     cards.append(_implied)
 else:
     def _load():
-        with st.container(border=True):
+        with ui.card():
             st.markdown("**Market-implied volatility**")
             if mb.vix is not None:
                 st.caption(f"VIX {ui.pct(mb.vix.iloc[-1])} on {mb.vix.index[-1]:%d %b %Y} (S&P 500, not this portfolio).")

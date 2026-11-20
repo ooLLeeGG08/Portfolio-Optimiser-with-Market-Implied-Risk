@@ -20,6 +20,9 @@ h3 {{ font-size: 0.95rem !important; font-family: {T.FONT} !important; font-weig
 [data-testid="stMetricLabel"] {{ min-height: 2.4rem; align-items: flex-start; }}
 [data-testid="stMetricLabel"] div {{ overflow: visible; white-space: normal; text-overflow: clip; }}
 [data-testid="stVerticalBlockBorderWrapper"] {{ background: {T.SURFACE}; }}
+/* cards in the same row share one height */
+[data-testid="stColumn"] > [data-testid="stVerticalBlock"] > [data-testid="stLayoutWrapper"]:has(> [class*="st-key-pi-card"]) {{ flex: 1 1 auto; }}
+[class*="st-key-pi-card"] {{ height: 100%; background: {T.SURFACE}; }}
 
 /* page header and sections */
 .pi-eyebrow {{ color: {T.ACCENT}; font-size: 0.75rem; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 600; }}
@@ -69,7 +72,15 @@ h3 {{ font-size: 0.95rem !important; font-family: {T.FONT} !important; font-weig
 
 
 def inject_css() -> None:
+    st.session_state["_pi_card"] = 0
     st.markdown(CSS, unsafe_allow_html=True)
+
+
+def card():
+    """Bordered card that stretches to the height of the tallest card in its row."""
+    n = st.session_state.get("_pi_card", 0) + 1
+    st.session_state["_pi_card"] = n
+    return st.container(border=True, key=f"pi-card-{n}")
 
 
 # --- formatting --------------------------------------------------------------------------------
@@ -133,11 +144,14 @@ def header(title: str, subtitle: str = "", dim: str = "", eyebrow: str = "Portfo
                 + (f'<div class="pi-sub">{subtitle}</div>' if subtitle else ""), unsafe_allow_html=True)
 
 
-def section(bright: str, dim: str = "", caption: str = "") -> None:
-    """Numbered section heading (/01, /02 …) with a two-tone uppercase title."""
+def section(bright: str, dim: str = "", caption: str = "", basis: RiskBasis | None = None) -> None:
+    """Numbered section heading (/01, /02 …) with a two-tone uppercase title and, optionally,
+    the basis that applies to every figure in the section."""
     n = st.session_state.get("_pi_section", 0) + 1
     st.session_state["_pi_section"] = n
-    st.markdown(f'<div class="pi-sec"><div class="num">/{n:02d}</div><div><div class="txt">{_two_tone(dim, bright)}</div>'
+    tag = f'&nbsp;&nbsp;{badge(basis, basis.label)}' if basis is not None else ""
+    st.markdown(f'<div class="pi-sec"><div class="num">/{n:02d}</div><div><div class="txt">{_two_tone(dim, bright)}'
+                f'<span style="vertical-align:middle;font-family:{T.FONT};text-transform:none">{tag}</span></div>'
                 + (f'<div class="cap">{caption}</div>' if caption else "") + "</div></div>", unsafe_allow_html=True)
 
 
@@ -153,9 +167,10 @@ def hero(title: str, dim: str, subtitle: str, pills: list[tuple[str, str, bool]]
 
 def kpi(label: str, value: str, basis: RiskBasis | None = None, help: str | None = None,
         delta: str | None = None) -> None:
-    with st.container(border=True):
+    with card():
         st.metric(label, value, delta=delta, help=help, delta_color="off")
-        if basis is not None:
+        # Observed is the default basis; it is stated once per section rather than on every card.
+        if basis is not None and basis is not RiskBasis.OBSERVED:
             st.markdown(f'<div class="pi-kpi-basis">{badge(basis)}</div>', unsafe_allow_html=True)
 
 
