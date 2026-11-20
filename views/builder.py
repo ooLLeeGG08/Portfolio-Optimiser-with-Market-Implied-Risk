@@ -129,7 +129,7 @@ with st.form("portfolio"):
     rebalance = c[2].selectbox("Rebalancing", list(RebalanceFrequency),
                                index=list(RebalanceFrequency).index(s.rebalance), format_func=lambda r: r.value.title())
     years = c[3].slider("History (years)", 3, 20, s.history_years)
-    c = st.columns(3)
+    c = st.columns(3, vertical_alignment="bottom")
     auto_rf = c[0].toggle("Live risk-free rate", s.risk_free_rate is None,
                           help="On: use the latest 13-week US Treasury bill yield. Off: use the manual rate.")
     rf_pct = c[1].number_input("Manual risk-free rate (% p.a.)", -5.0, 25.0,
