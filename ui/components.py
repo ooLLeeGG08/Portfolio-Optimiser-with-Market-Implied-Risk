@@ -268,7 +268,7 @@ def sidebar_portfolio(slot, tickers, weights, pending: bool = False) -> None:
                     unsafe_allow_html=True)
         st.caption(", ".join(f"{t} {w:.0%}" for t, w in zip(tickers, weights) if t))
         if pending:
-            st.markdown(f'<div class="pi-note" style="color:{T.ACCENT}">Edited, not applied yet. Click '
+            st.markdown(f'<div class="pi-note" style="color:{T.ACCENT};margin-bottom:8px">Edited, not applied yet. Click '
                         f'<b>Apply portfolio</b> to analyse it.</div>', unsafe_allow_html=True)
 
 
