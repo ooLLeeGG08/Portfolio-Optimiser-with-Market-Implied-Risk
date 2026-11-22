@@ -102,6 +102,21 @@ h3.pi-takeaway-title {{ margin: 0 0 0.35rem 0 !important; font-size: 0.95rem !im
 [data-testid="stHeadingWithActionElements"]:has(.pi-card-h) [data-testid="stHeaderActionElements"],
 [data-testid="stHeadingWithActionElements"]:has(.pi-takeaway-title) [data-testid="stHeaderActionElements"] {{ display: none !important; }}
 .st-key-pi-takeaways {{ background: {T.SURFACE}; }}
+.pi-chart-title {{ font-size: 0.82rem; font-weight: 600; color: {T.TEXT}; line-height: 1.35; margin: 0.4rem 0 -0.4rem 0; text-wrap: pretty; }}
+/* Phones and tablets (no hover): Streamlit shows table toolbars permanently, 44px above the table,
+   where they covered the heading or caption. Give them their own row there. Plotly's toolbar is
+   hidden on touch screens; pinch and drag still work on the chart. */
+@media (hover: none) {{
+  [data-testid="stDataFrame"] {{ margin-top: 2.6rem; }}
+  .modebar-container {{ display: none !important; }}
+}}
+[class*="st-key-pi-card-"] [data-testid="stPageLink-NavLink"] * {{ white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }}
+/* Narrow screens: rows of KPI cards wrap two per row instead of one, so less scrolling. */
+@media (max-width: 640px) {{
+  [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] [class*="st-key-pi-card-"]) {{ flex-wrap: wrap; gap: 0.75rem; }}
+  [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] [class*="st-key-pi-card-"]) > [data-testid="stColumn"] {{
+    min-width: calc(50% - 0.4rem) !important; flex: 1 1 calc(50% - 0.4rem) !important; width: calc(50% - 0.4rem) !important; }}
+}}
 .pi-note {{ color: {T.MUTED}; font-size: 0.82rem; line-height: 1.45; }}
 .pi-kpi-basis {{ margin-top: -0.35rem; }}
 
@@ -292,9 +307,18 @@ def chart_description(fig) -> str:
 
 
 def chart(fig, description: str | None = None) -> None:
-    """Interactive chart plus a screen-reader description (the figure itself is drawn as SVG)."""
+    """Interactive chart plus a screen-reader description (the figure itself is drawn as SVG).
+
+    The title is drawn as text above the chart rather than inside it: Plotly cannot wrap a title,
+    so on a phone a long one was cut off and covered by the chart toolbar."""
     import html
     text = description or chart_description(fig)
+    title = fig.layout.title.text if fig.layout.title else None
+    if title:
+        legend = any(getattr(tr, "showlegend", None) is not False and getattr(tr, "name", None) for tr in fig.data)
+        legend = legend and fig.layout.showlegend is not False
+        fig.update_layout(title_text=None, margin_t=fig.layout.margin.t if legend and fig.layout.margin.t else (44 if legend else 20))
+        st.markdown(f'<div class="pi-chart-title" aria-hidden="true">{html.escape(title)}</div>', unsafe_allow_html=True)
     st.markdown(f'<p class="pi-sr">{html.escape(text)}</p>', unsafe_allow_html=True)
     st.plotly_chart(fig, width="stretch", theme=None, config={"displaylogo": False})
 
