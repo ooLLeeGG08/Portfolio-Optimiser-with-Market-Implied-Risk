@@ -1,5 +1,7 @@
 import streamlit as st
 
+import config
+
 from app_core import pipeline as pl
 from reporting.pdf_generator import SECTIONS, generate_pdf
 from ui import components as ui
@@ -20,9 +22,9 @@ with right:
     with st.container(border=True):
         st.markdown("**Include**")
         inc_fc = st.checkbox("GARCH and LSTM volatility forecasts", value=True,
-                             help="Computed now if needed (about 2 minutes for 7 assets).")
+                             help=f"Computed now if needed ({config.forecast_runtime_text(len(mb.spec.tickers))}).")
         inc_iv = st.checkbox("Market-implied volatility (VIX and option chains)", value=True,
-                             help="Downloaded now if needed (about 25 seconds).")
+                             help=f"Downloaded now if needed (about {config.OPTION_FETCH_SECONDS} seconds).")
         st.caption(f"Forecasts: {'ready' if fb is not None else 'not computed yet'} · "
                    f"Option data: {'ready' if ib is not None else 'not loaded yet'}")
         go = st.button("Generate PDF report", type="primary", icon=":material/picture_as_pdf:", width="stretch")

@@ -39,6 +39,19 @@ EXTREME_RETURN_THRESHOLD = 0.40  # |daily simple return| flagged for review (not
 # --- Cache -----------------------------------------------------------------------
 CACHE_TTL_HOURS = 12.0
 
+# --- Expected run times shown to users ------------------------------------------
+# Measured: ~15 s per series on a laptop CPU, ~21 s in the hosted container (default portfolio:
+# 7 assets + the portfolio itself). The hosted figure is used because that is where visitors wait.
+FORECAST_SECONDS_PER_SERIES = 21
+OPTION_FETCH_SECONDS = 25
+
+
+def forecast_runtime_text(n_assets: int) -> str:
+    """'about N minutes' for forecasting n assets plus the portfolio."""
+    minutes = max(1, round((n_assets + 1) * FORECAST_SECONDS_PER_SERIES / 60))
+    return f"about {minutes} minute{'s' if minutes > 1 else ''}"
+
+
 # --- Out-of-sample protocol (see docs/METHODOLOGY.md §8) ---------------------------
 TEST_WINDOW_DAYS = 504  # locked final test window, ~2 years of trading days
 

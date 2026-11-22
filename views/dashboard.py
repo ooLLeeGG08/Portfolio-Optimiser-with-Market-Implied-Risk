@@ -95,7 +95,7 @@ else:
     def _todo():
         with ui.card():
             st.markdown("**GARCH and LSTM forecasts**")
-            st.caption("Not yet computed (about 2 minutes).")
+            st.caption(f"Not yet computed ({config.forecast_runtime_text(len(mb.spec.tickers))}).")
             st.page_link("views/forecasting.py", label="Run forecasts", icon=":material/play_arrow:")
     cards.append(_todo)
 if ib is not None:

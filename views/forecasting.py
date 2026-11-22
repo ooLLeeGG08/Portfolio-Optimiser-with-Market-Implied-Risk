@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
 
-
+import config
 from core.types import RiskBasis
 from ui import components as ui
 from ui import state
@@ -44,7 +44,7 @@ def run_controls(label: str, primary: bool) -> None:
 
 run_caption = (f"Fits GARCH and trains one LSTM per asset plus the portfolio on up to "
                f"{mb.settings.forecast_history_years} years of data, then evaluates all models on a locked "
-               f"out-of-sample window. Takes about {15 * (len(mb.spec.tickers) + 1) // 60 + 1} minutes; "
+               f"out-of-sample window. Takes {config.forecast_runtime_text(len(mb.spec.tickers))}; "
                f"results are kept for the rest of the day.")
 if fb is None:
     with st.container(border=True):
