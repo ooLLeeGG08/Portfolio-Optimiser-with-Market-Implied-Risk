@@ -18,20 +18,22 @@ ui.inject_css()
 st.logo(str(config.PROJECT_ROOT / "assets" / "logo.svg"), size="large",
         icon_image=str(config.PROJECT_ROOT / "assets" / "icon.svg"))
 
+# Three groups so a first-time visitor sees where to begin: the three core pages first, the
+# deeper volatility and stress analysis next, then editing the portfolio and exporting.
 pages = {
-    "Overview": [
+    "Start here": [
         st.Page("views/dashboard.py", title="Dashboard", icon=":material/space_dashboard:", default=True),
-        st.Page("views/builder.py", title="Portfolio Builder", icon=":material/tune:"),
-    ],
-    "Analysis": [
         st.Page("views/optimization.py", title="Portfolio Optimisation", icon=":material/scatter_plot:"),
+        st.Page("views/risk.py", title="Risk Analytics", icon=":material/shield:"),
+    ],
+    "Go deeper": [
         st.Page("views/forecasting.py", title="Volatility Forecasting", icon=":material/timeline:"),
         st.Page("views/implied.py", title="Market-Implied Volatility", icon=":material/candlestick_chart:"),
-        st.Page("views/risk.py", title="Risk Analytics", icon=":material/shield:"),
         st.Page("views/scenarios.py", title="Scenario Analysis", icon=":material/bolt:"),
         st.Page("views/evaluation.py", title="Model Evaluation", icon=":material/fact_check:"),
     ],
-    "Output": [
+    "Your portfolio": [
+        st.Page("views/builder.py", title="Portfolio Builder", icon=":material/tune:"),
         st.Page("views/report.py", title="PDF Report", icon=":material/picture_as_pdf:"),
     ],
 }
