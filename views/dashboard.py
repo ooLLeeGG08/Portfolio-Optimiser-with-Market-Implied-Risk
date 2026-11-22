@@ -12,7 +12,7 @@ pa = state.portfolio()
 s = mb.settings
 
 ui.hero(
-    "risk & volatility", "Portfolio",
+    "overview", "Portfolio",
     f"A {len(mb.spec.tickers)}-asset portfolio measured against {s.benchmark}, valued in {config.BASE_CURRENCY}"
     + (" (foreign listings converted, unhedged)" if mb.foreign_assets else "")
     + f". Prices to {mb.as_of:%d %b %Y}; "

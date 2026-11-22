@@ -173,7 +173,7 @@ class NumberedCanvas(rl_canvas.Canvas):
         if page > 1:
             self.setFont("DejaVu-Bold", 7)
             self.setFillColor(ACCENT)
-            self.drawString(MARGIN, PAGE_H - 0.5 * inch, "PORTFOLIO INTELLIGENCE")
+            self.drawString(MARGIN, PAGE_H - 0.5 * inch, "PORTFOLIO OPTIMIZER")
             self.setFont("DejaVu", 7)
             self.setFillColor(MUTED)
             self.drawString(MARGIN + 105, PAGE_H - 0.5 * inch, "Portfolio Risk Report")
@@ -208,7 +208,7 @@ def _tail(rd: ReportData):
 
 def cover(rd: ReportData) -> list:
     mb, s = rd.mb, rd.mb.settings
-    out = [Spacer(1, 0.25 * inch), P("PORTFOLIO INTELLIGENCE", "eyebrow"),
+    out = [Spacer(1, 0.25 * inch), P("PORTFOLIO OPTIMIZER", "eyebrow"),
            P("Portfolio Risk Report", "title"),
            P(f"{len(mb.spec.tickers)}-asset portfolio vs {E(s.benchmark)} · "
              + ", ".join(f"{E(t)} {w:.1%}" for t, w in mb.spec.weights.items()), "subtitle")]
@@ -721,7 +721,7 @@ def disclaimers(rd: ReportData) -> list:
 def generate_pdf(rd: ReportData) -> bytes:
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=MARGIN, rightMargin=MARGIN, topMargin=0.8 * inch,
-                            bottomMargin=0.85 * inch, title="Portfolio Risk Report", author="Portfolio Intelligence",
+                            bottomMargin=0.85 * inch, title="Portfolio Risk Report", author="Portfolio Optimizer",
                             subject=f"Portfolio risk report generated {rd.generated_at:%Y-%m-%d %H:%M} UTC")
     story = []
     for part in (cover, executive_summary, composition, performance, optimisation, frontier, historical_risk, var_cvar,

@@ -1,9 +1,9 @@
-# Portfolio Intelligence
+# Portfolio Optimizer
 
 **Portfolio optimisation, risk analytics, volatility forecasting and market-implied volatility — in
 one Streamlit app with a generated PDF risk report.**
 
-Portfolio Intelligence builds a portfolio from free market data, optimises it, measures its risk
+Portfolio Optimizer builds a portfolio from free market data, optimises it, measures its risk
 (VaR, CVaR, drawdowns, Euler risk contributions), forecasts volatility with historical, GARCH(1,1)
 and LSTM models, compares those forecasts with option-implied volatility, stress-tests the
 portfolio, evaluates everything out of sample, and writes a research-style PDF report.
@@ -62,8 +62,8 @@ environment variables or API keys are needed.
 
 **Test the exact image locally first (optional):**
 ```bash
-docker build --platform linux/amd64 -f Dockerfile.vercel -t portfolio-intelligence .
-docker run --rm -p 8080:80 portfolio-intelligence    # open http://localhost:8080
+docker build --platform linux/amd64 -f Dockerfile.vercel -t portfolio-optimizer .
+docker run --rm -p 8080:80 portfolio-optimizer    # open http://localhost:8080
 ```
 
 **What to expect on Vercel (especially the free Hobby plan)**

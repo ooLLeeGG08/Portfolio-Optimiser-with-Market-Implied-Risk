@@ -1,4 +1,4 @@
-"""Portfolio Intelligence — Streamlit entry point.
+"""Portfolio Optimizer — Streamlit entry point.
 
 Run with:  streamlit run app.py
 """
@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import streamlit as st
 
-st.set_page_config(page_title="Portfolio Intelligence", page_icon=":material/insights:",
+st.set_page_config(page_title="Portfolio Optimizer", page_icon=":material/insights:",
                    layout="wide", initial_sidebar_state="auto")
 
 import config  # noqa: E402

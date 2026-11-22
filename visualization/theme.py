@@ -44,7 +44,7 @@ BASIS_SHORT = {
 FONT = "Manrope, -apple-system, Segoe UI, Roboto, sans-serif"
 DISPLAY_FONT = "Unbounded, Manrope, sans-serif"
 
-pio.templates["portfolio_intelligence"] = go.layout.Template(layout=go.Layout(
+pio.templates["portfolio_optimizer"] = go.layout.Template(layout=go.Layout(
     paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
     font=dict(family=FONT, color=TEXT, size=12),
     title=dict(font=dict(size=13, color=TEXT, family=FONT, weight=600), x=0, xanchor="left", y=0.97),
@@ -58,4 +58,4 @@ pio.templates["portfolio_intelligence"] = go.layout.Template(layout=go.Layout(
     hoverlabel=dict(bgcolor=SURFACE_2, bordercolor=BORDER, font=dict(family=FONT, color=TEXT)),
     margin=dict(l=12, r=12, t=64, b=16),
 ))
-pio.templates.default = "portfolio_intelligence"
+pio.templates.default = "portfolio_optimizer"

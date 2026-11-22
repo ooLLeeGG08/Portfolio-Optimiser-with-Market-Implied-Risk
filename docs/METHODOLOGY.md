@@ -1,6 +1,6 @@
 # Methodology, Assumptions and Limitations
 
-This document is the reference for every quantitative choice in Portfolio Intelligence.
+This document is the reference for every quantitative choice in Portfolio Optimizer.
 The PDF report's "Methodology" and "Model limitations and data quality" sections are
 derived from it. Sections for components not yet implemented are marked
 *(specification — implemented in Phase N)*; this file is updated as each phase lands.

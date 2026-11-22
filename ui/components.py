@@ -199,7 +199,7 @@ def _two_tone(dim: str, bright: str) -> str:
     return f'<span class="dim">{dim}</span> {bright}' if dim else bright
 
 
-def header(title: str, subtitle: str = "", dim: str = "", eyebrow: str = "Portfolio Intelligence") -> None:
+def header(title: str, subtitle: str = "", dim: str = "", eyebrow: str = "Portfolio Optimizer") -> None:
     """Page title: optional muted lead-in (``dim``) followed by the bright ``title``."""
     st.session_state["_pi_section"] = 0
     st.markdown(f'<div class="pi-eyebrow">{eyebrow}</div><h1 class="pi-title">{_two_tone(dim, title)}</h1>'

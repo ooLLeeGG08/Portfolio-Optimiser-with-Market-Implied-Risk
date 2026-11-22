@@ -8,7 +8,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     # Containers are stateless: keep caches in the writable temp directory.
-    PI_CACHE_DIR=/tmp/portfolio-intelligence \
+    PI_CACHE_DIR=/tmp/portfolio-optimizer \
     PI_HOSTED=1 \
     MPLCONFIGDIR=/tmp/matplotlib \
     # The forecasting work is single-thread bound; extra threads only add memory.
