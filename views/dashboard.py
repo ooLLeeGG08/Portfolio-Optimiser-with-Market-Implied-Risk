@@ -1,8 +1,10 @@
+import numpy as np
 import streamlit as st
 
 import config
 
-from core.types import IVSource, RiskBasis
+from core.types import IVSource, RebalanceFrequency, RiskBasis
+from portfolio.optimization import estimate_inputs, portfolio_stats
 from ui import components as ui
 from ui import state
 from visualization import charts
@@ -47,7 +49,15 @@ with c[5]:
     ui.kpi("Max drawdown", ui.pct(r.max_drawdown.depth), RiskBasis.OBSERVED,
            help=f"Peak {r.max_drawdown.peak_date:%d %b %Y} → trough {r.max_drawdown.trough_date:%d %b %Y}.")
 
-st.caption(ui.value_basis(mb.spec, perf.start))
+# Why these numbers differ from the Strategy Comparison row for the same weights (computed, not assumed).
+fixed = portfolio_stats(mb.spec.weights, estimate_inputs(mb.asset_returns, mb.risk_free_rate, cov_method=s.cov_method))
+row = "Equal weight" if np.allclose(mb.spec.weights, 1 / len(mb.spec.weights)) else "User-defined"
+drift = ("drift between " + s.rebalance.value + " rebalances" if s.rebalance is not RebalanceFrequency.NONE
+         else "drift freely (never rebalanced)")
+st.caption(f"{ui.value_basis(mb.spec, perf.start)} Return and volatility here follow this simulated portfolio, whose "
+           f"weights {drift}. The Strategy Comparison's {row} row shows {ui.pct(fixed.expected_return, 2)} and "
+           f"{ui.pct(fixed.volatility, 2)} because it holds the target weights fixed every day and uses the shrunk "
+           f"(Ledoit–Wolf) covariance.")
 
 left, right = st.columns([2, 1])
 with left:
