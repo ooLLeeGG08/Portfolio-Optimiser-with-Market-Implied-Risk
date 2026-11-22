@@ -96,6 +96,8 @@ a.pi-download:hover {{ background: {T.ACCENT_SOFT}; }}
 /* badges and notes */
 .pi-badge {{ display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.72rem;
             font-weight: 600; letter-spacing: 0.02em; border: 1px solid; margin-right: 6px; white-space: nowrap; }}
+.pi-takeaway-title {{ margin-left: 6px; font-size: 0.95rem; }}
+.st-key-pi-takeaways {{ background: {T.SURFACE}; }}
 .pi-note {{ color: {T.MUTED}; font-size: 0.82rem; line-height: 1.45; }}
 .pi-kpi-basis {{ margin-top: -0.35rem; }}
 

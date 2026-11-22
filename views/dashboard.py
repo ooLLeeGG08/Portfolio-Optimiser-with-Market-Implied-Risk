@@ -2,8 +2,9 @@ import numpy as np
 import streamlit as st
 
 import config
-
+from app_core.takeaways import key_takeaways
 from core.types import IVSource, RebalanceFrequency, RiskBasis
+from implied_volatility import vix as vx
 from portfolio.optimization import estimate_inputs, portfolio_stats
 from ui import components as ui
 from ui import state
@@ -28,6 +29,18 @@ if mb.exclusion_message:
     st.warning(mb.exclusion_message, icon=":material/warning:")
 for e in mb.errors:
     st.warning(e, icon=":material/warning:")
+
+# --- key takeaways (sentences generated from the numbers below) -------------------------------------
+try:
+    vix_sum = vx.vix_summary(mb.vix) if mb.vix is not None else None
+except ValueError:
+    vix_sum = None
+with st.container(border=True, key="pi-takeaways"):
+    st.markdown("**Key takeaways**")
+    for col, k in zip(st.columns(3), key_takeaways(pa.contributions, vix_sum, pa.risk.max_drawdown)):
+        with col:
+            st.markdown(f'{ui.badge(k.basis)} <b class="pi-takeaway-title">{k.title}</b>', unsafe_allow_html=True)
+            st.markdown(k.text)
 
 # --- portfolio overview -----------------------------------------------------------------------
 ui.section("overview", "Portfolio", basis=RiskBasis.OBSERVED)
