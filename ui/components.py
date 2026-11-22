@@ -56,6 +56,11 @@ a:focus-visible, button:focus-visible, [role="button"]:focus-visible, summary:fo
 .pi-side-note {{ border-top: 1px solid {T.BORDER}; margin-top: 10px; padding-top: 25px;
   color: {T.MUTED}; font-size: 0.875rem; line-height: 1.5; }}
 
+/* Embedded-file download link, styled like the primary button. */
+a.pi-download {{ display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.55rem 1.1rem; border-radius: 999px;
+  background: {T.ACCENT}; color: {T.BG} !important; font-weight: 600; font-size: 0.9rem; text-decoration: none !important; }}
+a.pi-download:hover {{ background: {T.ACCENT_SOFT}; }}
+
 /* Text read by screen readers but not shown (chart descriptions). */
 .pi-sr {{ position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
           clip: rect(0 0 0 0); white-space: nowrap; border: 0; }}
@@ -270,6 +275,15 @@ def sidebar_portfolio(slot, tickers, weights, pending: bool = False) -> None:
         if pending:
             st.markdown(f'<div class="pi-note" style="color:{T.ACCENT};margin-bottom:8px">Edited, not applied yet. Click '
                         f'<b>Apply portfolio</b> to analyse it.</div>', unsafe_allow_html=True)
+
+
+def download_link(data: bytes, file_name: str, mime: str, label: str) -> None:
+    """A download button whose file is embedded in the page, so it works on any server instance."""
+    import base64
+    import html
+    b64 = base64.b64encode(data).decode("ascii")
+    st.markdown(f'<a class="pi-download" href="data:{mime};base64,{b64}" download="{html.escape(file_name)}">'
+                f'<span aria-hidden="true">↓</span> {html.escape(label)}</a>', unsafe_allow_html=True)
 
 
 def pct_columns(df: pd.DataFrame, cols) -> dict:

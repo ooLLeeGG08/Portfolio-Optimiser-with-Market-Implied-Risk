@@ -40,7 +40,9 @@ if go:
 if "report_pdf" in st.session_state:
     pdf, at = st.session_state["report_pdf"]
     st.success(f"Report generated {at:%d %b %Y %H:%M} UTC ({len(pdf) // 1024:,} KB).", icon=":material/check:")
-    st.download_button("Download PDF", data=pdf, file_name=f"portfolio_risk_report_{at:%Y%m%d_%H%M}.pdf",
-                       mime="application/pdf", icon=":material/download:", type="primary")
+    # The PDF travels inside the page (a data link), so the download never needs a second request to
+    # the server. On serverless hosting that request can reach another instance, which does not hold
+    # the file and answers "File not found" (Streamlit's download_button works that way).
+    ui.download_link(pdf, f"portfolio_risk_report_{at:%Y%m%d_%H%M}.pdf", "application/pdf", "Download PDF")
     st.caption("The report reflects the portfolio and data at the time it was generated. Regenerate after changing "
                "the portfolio.")
