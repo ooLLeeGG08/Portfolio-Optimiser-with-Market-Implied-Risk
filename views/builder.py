@@ -84,7 +84,7 @@ w_total = float(table["Weight (%)"].fillna(0).sum())
 a_total = float(table["Amount ($)"].fillna(0).sum())
 gap = abs(w_total - 100)
 if gap <= ROUNDING_TOLERANCE_PCT:
-    st.caption(f"Portfolio value ${a_total:,.2f} · weights sum to 100%.")
+    st.caption(f"Hypothetical starting amount ${a_total:,.2f}, invested at the start of the history window · weights sum to 100%.")
 else:
     st.warning(f"Weights sum to {w_total:.2f}% — they must sum to 100% (±{ROUNDING_TOLERANCE_PCT}) before applying.")
 

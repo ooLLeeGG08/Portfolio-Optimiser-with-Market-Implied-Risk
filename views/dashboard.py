@@ -17,7 +17,7 @@ ui.hero(
     + (" (foreign listings converted, unhedged)" if mb.foreign_assets else "")
     + f". Prices to {mb.as_of:%d %b %Y}; "
     f"risk-free rate {ui.pct(mb.risk_free_rate, 2)} ({mb.risk_free_source}).",
-    [(ui.money(pa.current_value), "portfolio value", True),
+    [(ui.money(pa.current_value), f"hypothetical value from {ui.money(mb.spec.initial_value)}", True),
      (ui.pct(pa.risk.annualized_volatility), "volatility, observed", False),
      (ui.num(pa.risk.sharpe), "Sharpe ratio, observed", False),
      (f"{s.horizon_days}d", "risk horizon", False)])
@@ -32,8 +32,8 @@ ui.section("overview", "Portfolio", basis=RiskBasis.OBSERVED)
 r, perf = pa.risk, pa.performance
 c = st.columns(6)
 with c[0]:
-    ui.kpi("Portfolio value", ui.money(pa.current_value), RiskBasis.OBSERVED,
-           help=f"Value of the simulated portfolio today, from {ui.money(mb.spec.initial_value)} invested on {perf.start:%d %b %Y}.")
+    ui.kpi("Hypothetical value", ui.money(pa.current_value), RiskBasis.OBSERVED,
+           help=ui.value_basis(mb.spec, perf.start))
 with c[1]:
     ui.kpi("Assets", str(len(mb.spec.tickers)))
 with c[2]:
@@ -46,6 +46,8 @@ with c[4]:
 with c[5]:
     ui.kpi("Max drawdown", ui.pct(r.max_drawdown.depth), RiskBasis.OBSERVED,
            help=f"Peak {r.max_drawdown.peak_date:%d %b %Y} → trough {r.max_drawdown.trough_date:%d %b %Y}.")
+
+st.caption(ui.value_basis(mb.spec, perf.start))
 
 left, right = st.columns([2, 1])
 with left:

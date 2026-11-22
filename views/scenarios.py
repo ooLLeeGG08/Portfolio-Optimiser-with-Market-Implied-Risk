@@ -41,7 +41,7 @@ def show_tables(results):
 
 
 ui.section("scenarios", "Standard")
-ui.basis_line(RiskBasis.HYPOTHETICAL, note=f" Portfolio value {ui.money(v)}.")
+ui.basis_line(RiskBasis.HYPOTHETICAL, note=f" Hypothetical portfolio value {ui.money(v)} ({ui.money(mb.spec.initial_value)} invested on {pa.performance.start:%d %b %Y}).")
 std = default_scenarios(mb, pa)
 show_tables(std)
 ui.chart(charts.scenario_chart(std))

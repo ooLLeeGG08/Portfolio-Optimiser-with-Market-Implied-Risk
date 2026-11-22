@@ -53,7 +53,7 @@ for method, g in notes_by_method.groupby("Method", sort=False):
              if any(s not in common for s in r)]
     lines.append(f"**{method}**: " + " ".join(common + extra))
 st.markdown("\n".join(f"- {x}" for x in lines))
-ui.basis_line(RiskBasis.OBSERVED, note=f" Portfolio value {ui.money(pa.current_value)}. "
+ui.basis_line(RiskBasis.OBSERVED, note=f" Hypothetical portfolio value {ui.money(pa.current_value)} ({ui.money(mb.spec.initial_value)} invested on {pa.performance.start:%d %b %Y}). "
               + ("" if hz == 1 else f"{hz}-day figures scale the 1-day estimates by √{hz} (assumes independent returns)."))
 h = {(e.method, e.confidence): e for e in pa.tail_risk}
 ui.chart(charts.return_distribution_chart(pa.path.returns, h[("Historical", 0.95)].var, h[("Historical", 0.99)].var))

@@ -205,6 +205,12 @@ RETURN_HELP = ("Average daily return over the selected history × 252 (arithmeti
                "is not a forecast: over 10 years its standard error is about volatility / √10, i.e. several "
                "percentage points a year.")
 
+def value_basis(spec, start) -> str:
+    """Where the portfolio value comes from: a simulated amount, not an account."""
+    return (f"Hypothetical: {money(spec.initial_value)} invested on {pd.Timestamp(start):%d %b %Y} "
+            f"(start of the history window), {spec.rebalance.value} rebalancing, no costs. Not a real account.")
+
+
 # In the page header as well as the sidebar: on phones the sidebar is collapsed.
 DISCLAIMER = '<span class="pi-disclaimer">· Not investment advice</span>'
 
