@@ -61,13 +61,40 @@ def settings() -> pl.AnalysisSettings:
         st.session_state["settings"] = _from_query(st.query_params) or pl.AnalysisSettings()
     s = st.session_state["settings"]
     if s != pl.AnalysisSettings() or "t" in st.query_params:
-        st.query_params.from_dict(_to_query(s))
+        st.query_params.update(_to_query(s))
     return s
+
+
+# --- long jobs that survive a dropped connection --------------------------------------------------
+# On serverless hosting the browser's connection can be cut during a multi-minute run; the page then
+# reconnects as a new session and the run's result is lost. A job marker in the URL (tied to the
+# portfolio) lets the reconnected page continue the job automatically instead of waiting for a
+# second click. Finished assets are cached, so the continuation resumes where the run stopped.
+
+def _portfolio_key() -> str:
+    import hashlib
+    return hashlib.sha1(repr(settings()).encode()).hexdigest()[:10]
+
+
+def mark_pending(job: str, extra: str = "") -> None:
+    st.query_params[job] = _portfolio_key() + extra
+
+
+def pending(job: str) -> str | None:
+    """The job's extra data if it was started for the current portfolio and not finished, else None."""
+    v = st.query_params.get(job)
+    key = _portfolio_key()
+    return v[len(key):] if v and v.startswith(key) else None
+
+
+def clear_pending(job: str) -> None:
+    if job in st.query_params:
+        del st.query_params[job]
 
 
 def set_settings(s: pl.AnalysisSettings) -> None:
     st.session_state["settings"] = s
-    st.query_params.from_dict(_to_query(s))
+    st.query_params.update(_to_query(s))
 
 
 # --- security search -------------------------------------------------------------------------

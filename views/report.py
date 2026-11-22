@@ -28,6 +28,14 @@ with right:
         go = st.button("Generate PDF report", type="primary", icon=":material/picture_as_pdf:", width="stretch")
 
 if go:
+    # Record the request in the URL and end this run first, so a reconnect during the long job
+    # continues it by itself (the browser only receives URL changes when a run ends).
+    state.mark_pending("rp", f"{int(inc_fc)}{int(inc_iv)}")
+    st.rerun()
+job = state.pending("rp")
+if job is not None:
+    inc_fc, inc_iv = job[:1] == "1", job[1:2] == "1"
+    st.info("Building the report. If the connection resets, it continues by itself.", icon=":material/autorenew:")
     if inc_fc and fb is None:
         fb = state.run_forecasts()
     if inc_iv:
@@ -36,6 +44,7 @@ if go:
         oa = state.optimization(0.0, 0.4, "max_sharpe", None)
         rd = pl.assemble_report(mb, pa, oa, state.backtests(), fb if inc_fc else None, ib if inc_iv else None)
         st.session_state["report_pdf"] = (generate_pdf(rd), rd.generated_at)
+    state.clear_pending("rp")
 
 if "report_pdf" in st.session_state:
     pdf, at = st.session_state["report_pdf"]

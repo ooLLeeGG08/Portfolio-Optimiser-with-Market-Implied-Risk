@@ -1,7 +1,6 @@
 import pandas as pd
 import streamlit as st
 
-import config
 
 from core.types import RiskBasis
 from ui import components as ui
@@ -31,13 +30,23 @@ if fb is None:
                    f"{mb.settings.forecast_history_years} years of data, then evaluates all models on a locked "
                    f"out-of-sample window. Takes about {15 * (len(mb.spec.tickers) + 1) // 60 + 1} minutes; "
                    f"results are kept for the rest of the day.")
-        if config.HOSTED:
-            st.caption("On the hosted version the connection can reset during a long run. If that happens, click "
-                       "the button again: every finished asset is kept, so the run resumes where it stopped.")
-        if st.button("Run volatility forecasts", type="primary", icon=":material/play_arrow:"):
+        running = state.pending("fc") is not None
+        if running:
+            st.info("Running the forecasts. If the connection resets, the run continues by itself; finished "
+                    "assets are kept.", icon=":material/autorenew:")
+        clicked = st.button("Run volatility forecasts", type="primary", icon=":material/play_arrow:",
+                            disabled=running)
+        if clicked:
+            # Record the request in the URL first and end this run, so the browser holds the marker
+            # before the long job starts; a reconnect mid-run then continues the job by itself.
+            state.mark_pending("fc")
+            st.rerun()
+        if running:
             state.run_forecasts()
+            state.clear_pending("fc")
             st.rerun()
     st.stop()
+state.clear_pending("fc")
 
 for name, err in fb.failures.items():
     st.warning(f"{name}: forecasting failed — {err}", icon=":material/warning:")
