@@ -1,0 +1,52 @@
+{
+  "format_version": 1,
+  "generated_at": "2026-11-22T20:18:31+00:00",
+  "data_as_of": "2026-11-20T00:00:00",
+  "horizon_days": 21,
+  "settings": {
+    "tickers": [
+      "AAPL",
+      "MSFT",
+      "JPM",
+      "XOM",
+      "JNJ",
+      "TLT",
+      "GLD"
+    ],
+    "weights": [
+      0.14285714285714285,
+      0.14285714285714285,
+      0.14285714285714285,
+      0.14285714285714285,
+      0.14285714285714285,
+      0.14285714285714285,
+      0.14285714285714285
+    ],
+    "benchmark": "SPY",
+    "horizon_days": 21,
+    "risk_free_rate": null,
+    "rebalance": "monthly",
+    "initial_value": 100000.0,
+    "history_years": 10,
+    "forecast_history_years": 20,
+    "cov_method": "ledoit_wolf",
+    "cost_bps": 10.0,
+    "backtest_lookback": 252
+  },
+  "series": [
+    "AAPL",
+    "MSFT",
+    "JPM",
+    "XOM",
+    "JNJ",
+    "TLT",
+    "GLD",
+    "Portfolio"
+  ],
+  "failures": {},
+  "runtime_seconds": 118,
+  "code_commit": "528ef87",
+  "python": "3.12.16",
+  "torch": "2.15.0",
+  "arch": "9.0.0"
+}
