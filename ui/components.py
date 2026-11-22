@@ -26,6 +26,7 @@ h3 {{ font-size: 0.95rem !important; font-family: {T.FONT} !important; font-weig
 
 /* page header and sections */
 .pi-eyebrow {{ color: {T.ACCENT}; font-size: 0.75rem; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 600; }}
+.pi-eyebrow .pi-disclaimer {{ color: {T.MUTED}; font-weight: 500; letter-spacing: 0.12em; white-space: nowrap; }}
 .pi-title {{ font-family: {T.DISPLAY_FONT}; font-weight: 400; font-size: 2.0rem; line-height: 1.12; text-transform: uppercase;
              letter-spacing: -0.01em; margin: 0.35rem 0 0.6rem 0; color: {T.TEXT}; }}
 .pi-title .dim, .pi-sec .dim {{ color: {T.MUTED}; }}
@@ -199,10 +200,14 @@ def _two_tone(dim: str, bright: str) -> str:
     return f'<span class="dim">{dim}</span> {bright}' if dim else bright
 
 
+# In the page header as well as the sidebar: on phones the sidebar is collapsed.
+DISCLAIMER = '<span class="pi-disclaimer">· Not investment advice</span>'
+
+
 def header(title: str, subtitle: str = "", dim: str = "", eyebrow: str = "Portfolio Optimizer") -> None:
     """Page title: optional muted lead-in (``dim``) followed by the bright ``title``."""
     st.session_state["_pi_section"] = 0
-    st.markdown(f'<div class="pi-eyebrow">{eyebrow}</div><h1 class="pi-title">{_two_tone(dim, title)}</h1>'
+    st.markdown(f'<div class="pi-eyebrow">{eyebrow} {DISCLAIMER}</div><h1 class="pi-title">{_two_tone(dim, title)}</h1>'
                 + (f'<div class="pi-sub">{subtitle}</div>' if subtitle else ""), unsafe_allow_html=True)
 
 
@@ -222,7 +227,7 @@ def hero(title: str, dim: str, subtitle: str, pills: list[tuple[str, str, bool]]
     p = "".join(f'<div class="pi-pill{"" if solid else " ghost"}"><b>{v}</b><span>{lab}</span></div>'
                 for v, lab, solid in pills)
     st.session_state["_pi_section"] = 0
-    st.markdown(f'<div class="pi-hero"><div class="pi-eyebrow">Dashboard</div>'
+    st.markdown(f'<div class="pi-hero"><div class="pi-eyebrow">Portfolio Optimizer {DISCLAIMER}</div>'
                 f'<h1 class="pi-title">{_two_tone(dim, title)}</h1><div class="pi-sub">{subtitle}</div>'
                 f'<div class="row">{p}</div></div>', unsafe_allow_html=True)
 
