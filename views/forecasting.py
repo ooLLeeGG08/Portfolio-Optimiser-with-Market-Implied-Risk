@@ -58,7 +58,7 @@ if fb is None:
     st.stop()
 if fb.precomputed:
     ui.precomputed_note(fb)
-    with st.expander("Recompute with today's data", expanded=running):
+    with st.expander("Recompute with today’s data", expanded=running):
         st.caption(run_caption)
         run_controls("Run volatility forecasts now", primary=False)
 state.clear_pending("fc")

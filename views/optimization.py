@@ -45,7 +45,7 @@ cfg[ui.RETURN_LABEL] = st.column_config.NumberColumn(format="percent", help=ui.R
 cfg["Sharpe ratio"] = st.column_config.NumberColumn(format="%.2f")
 st.dataframe(tab[metric_cols], width="stretch", column_config=cfg)
 for n in identical_strategy_notes(oa.results, oa.constraints):
-    st.caption(f":material/info: {n}")
+    st.caption(n)
 weights = tab[[c for c in tab.columns if c.startswith("w[")]].rename(columns=lambda c: c[2:-1])
 st.markdown("**Weights**")
 st.dataframe(weights, width="stretch", column_config=ui.pct_columns(weights, weights.columns))

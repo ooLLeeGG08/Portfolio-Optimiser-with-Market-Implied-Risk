@@ -36,10 +36,10 @@ try:
 except ValueError:
     vix_sum = None
 with st.container(border=True, key="pi-takeaways"):
-    st.markdown("**Key takeaways**")
+    st.markdown('<h2 class="pi-card-h">Key takeaways</h2>', unsafe_allow_html=True)
     for col, k in zip(st.columns(3), key_takeaways(pa.contributions, vix_sum, pa.risk.max_drawdown)):
         with col:
-            st.markdown(f'{ui.badge(k.basis)} <b class="pi-takeaway-title">{k.title}</b>', unsafe_allow_html=True)
+            st.markdown(f'<h3 class="pi-takeaway-title">{k.title}</h3><div style="margin-bottom:0.5rem">{ui.badge(k.basis)}</div>', unsafe_allow_html=True)
             st.markdown(k.text)
 
 # --- portfolio overview -----------------------------------------------------------------------
@@ -68,7 +68,7 @@ row = "Equal weight" if np.allclose(mb.spec.weights, 1 / len(mb.spec.weights)) e
 drift = ("drift between " + s.rebalance.value + " rebalances" if s.rebalance is not RebalanceFrequency.NONE
          else "drift freely (never rebalanced)")
 st.caption(f"{ui.value_basis(mb.spec, perf.start)} Return and volatility here follow this simulated portfolio, whose "
-           f"weights {drift}. The Strategy Comparison's {row} row shows {ui.pct(fixed.expected_return, 2)} and "
+           f"weights {drift}. The Strategy Comparison’s {row} row shows {ui.pct(fixed.expected_return, 2)} and "
            f"{ui.pct(fixed.volatility, 2)} because it holds the target weights fixed every day and uses the shrunk "
            f"(Ledoit–Wolf) covariance.")
 

@@ -12,6 +12,7 @@ from visualization import theme as T
 
 CSS = f"""
 <style>
+:root {{ color-scheme: dark; }}
 .block-container {{ padding-top: 3.6rem; max-width: 1320px; }}
 h1, h2, h3 {{ letter-spacing: -0.01em; }}
 h3 {{ font-size: 0.95rem !important; font-family: {T.FONT} !important; font-weight: 600 !important; color: {T.TEXT}; }}
@@ -96,7 +97,10 @@ a.pi-download:hover {{ background: {T.ACCENT_SOFT}; }}
 /* badges and notes */
 .pi-badge {{ display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.72rem;
             font-weight: 600; letter-spacing: 0.02em; border: 1px solid; margin-right: 6px; white-space: nowrap; }}
-.pi-takeaway-title {{ margin-left: 6px; font-size: 0.95rem; }}
+h2.pi-card-h, h3.pi-takeaway-title {{ padding: 0 !important; margin: 0 0 0.6rem 0 !important; font-family: {T.FONT} !important; font-size: 1rem !important; font-weight: 700 !important; letter-spacing: 0 !important; text-transform: none !important; color: {T.TEXT}; scroll-margin-top: 4rem; }}
+h3.pi-takeaway-title {{ margin: 0 0 0.35rem 0 !important; font-size: 0.95rem !important; }}
+[data-testid="stHeadingWithActionElements"]:has(.pi-card-h) [data-testid="stHeaderActionElements"],
+[data-testid="stHeadingWithActionElements"]:has(.pi-takeaway-title) [data-testid="stHeaderActionElements"] {{ display: none !important; }}
 .st-key-pi-takeaways {{ background: {T.SURFACE}; }}
 .pi-note {{ color: {T.MUTED}; font-size: 0.82rem; line-height: 1.45; }}
 .pi-kpi-basis {{ margin-top: -0.35rem; }}
@@ -179,7 +183,7 @@ def precomputed_note(fb) -> None:
         st.warning(f"{text} This copy is {age} days old; run the forecasts again for current results.",
                    icon=":material/history:")
     else:
-        st.caption(f":material/schedule: {text} Refreshed automatically after each US trading day.")
+        st.caption(f"{text} Refreshed automatically after each US trading day.")
 
 
 def basis_line(*bases: RiskBasis, note: str = "") -> None:
