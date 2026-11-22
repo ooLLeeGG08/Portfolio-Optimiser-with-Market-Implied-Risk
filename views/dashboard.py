@@ -37,8 +37,7 @@ with c[0]:
 with c[1]:
     ui.kpi("Assets", str(len(mb.spec.tickers)))
 with c[2]:
-    ui.kpi("Expected return (ann.)", ui.pct(r.annualized_return), RiskBasis.OBSERVED,
-           help="Historical arithmetic mean daily return × 252. An estimate from past data, not a prediction.")
+    ui.kpi(ui.RETURN_LABEL, ui.pct(r.annualized_return), RiskBasis.OBSERVED, help=ui.RETURN_HELP)
 with c[3]:
     ui.kpi("Volatility (ann.)", ui.pct(r.annualized_volatility), RiskBasis.OBSERVED)
 with c[4]:

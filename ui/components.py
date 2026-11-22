@@ -200,6 +200,11 @@ def _two_tone(dim: str, bright: str) -> str:
     return f'<span class="dim">{dim}</span> {bright}' if dim else bright
 
 
+RETURN_LABEL = "Historical average return (ann.)"
+RETURN_HELP = ("Average daily return over the selected history × 252 (arithmetic mean). It describes the past and "
+               "is not a forecast: over 10 years its standard error is about volatility / √10, i.e. several "
+               "percentage points a year.")
+
 # In the page header as well as the sidebar: on phones the sidebar is collapsed.
 DISCLAIMER = '<span class="pi-disclaimer">· Not investment advice</span>'
 

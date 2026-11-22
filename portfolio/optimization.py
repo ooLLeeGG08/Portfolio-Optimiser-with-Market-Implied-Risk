@@ -308,7 +308,7 @@ def compare_strategies(inputs: OptimizationInputs, constraints: Constraints = Co
 
 
 def comparison_table(results: list[OptimizedPortfolio]) -> pd.DataFrame:
-    rows = {r.strategy.value: {"Expected return (ann.)": r.stats.expected_return,
+    rows = {r.strategy.value: {"Historical average return (ann.)": r.stats.expected_return,
                                "Excess return over risk-free (ann.)": r.stats.excess_return,
                                "Volatility (ann.)": r.stats.volatility,
                                "Sharpe ratio": r.stats.sharpe,

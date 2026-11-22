@@ -39,8 +39,9 @@ ui.basis_line(RiskBasis.OBSERVED, note=f"Estimation window {oa.inputs.start:%d %
 
 ui.section("comparison", "Strategy")
 tab = comparison_table(oa.results)
-metric_cols = ["Expected return (ann.)", "Excess return over risk-free (ann.)", "Volatility (ann.)", "Sharpe ratio"]
+metric_cols = [ui.RETURN_LABEL, "Excess return over risk-free (ann.)", "Volatility (ann.)", "Sharpe ratio"]
 cfg = ui.pct_columns(tab, metric_cols[:3])
+cfg[ui.RETURN_LABEL] = st.column_config.NumberColumn(format="percent", help=ui.RETURN_HELP)
 cfg["Sharpe ratio"] = st.column_config.NumberColumn(format="%.2f")
 st.dataframe(tab[metric_cols], width="stretch", column_config=cfg)
 for n in identical_strategy_notes(oa.results, oa.constraints):
@@ -48,7 +49,8 @@ for n in identical_strategy_notes(oa.results, oa.constraints):
 weights = tab[[c for c in tab.columns if c.startswith("w[")]].rename(columns=lambda c: c[2:-1])
 st.markdown("**Weights**")
 st.dataframe(weights, width="stretch", column_config=ui.pct_columns(weights, weights.columns))
-st.caption("Expected return is the total (not excess) annualised arithmetic mean; Sharpe = excess return / volatility.")
+st.caption("Historical average return is the total (not excess) annualised arithmetic mean over the selected history; "
+           "Sharpe = excess return / volatility.")
 
 left, right = st.columns([3, 2])
 with left:
@@ -71,14 +73,16 @@ if c2.button("Apply to portfolio", icon=":material/check:"):
 
 ui.section("are these weights?", "How reliable")
 inp = oa.inputs
-est = pd.DataFrame({"Expected return (ann.)": inp.mu, "Standard error of expected return": inp.mu_standard_error,
+est = pd.DataFrame({ui.RETURN_LABEL: inp.mu, "Standard error of the average return": inp.mu_standard_error,
                     "Volatility (ann.)": pd.Series(inp.cov.matrix.values.diagonal() ** 0.5, index=inp.tickers)})
-st.dataframe(est, width="stretch", column_config=ui.pct_columns(est, est.columns))
+est_cfg = ui.pct_columns(est, est.columns)
+est_cfg[ui.RETURN_LABEL] = st.column_config.NumberColumn(format="percent", help=ui.RETURN_HELP)
+st.dataframe(est, width="stretch", column_config=est_cfg)
 st.caption("The standard error of an annualised mean return is volatility / √years. Over 10 years a stock with 30% "
-           "volatility has a standard error of about 9 percentage points — expected returns are estimated very imprecisely.")
+           "volatility has a standard error of about 9 percentage points — average returns are estimated very imprecisely.")
 if oa.sensitivity is not None:
     ui.chart(charts.sensitivity_chart(oa.sensitivity.summary))
-    st.caption(f"Expected returns were redrawn {oa.sensitivity.n_requested} times from their sampling distribution "
+    st.caption(f"Historical average returns were redrawn {oa.sensitivity.n_requested} times from their sampling distribution "
                f"N(μ̂, Σ/years) and the maximum-Sharpe portfolio re-solved each time"
                + (f" ({oa.sensitivity.n_failed} draws had no asset above the risk-free rate and were skipped)." if oa.sensitivity.n_failed else ".")
                + " Wide ranges mean the optimal weights are not statistically well determined.")
@@ -87,7 +91,8 @@ elif oa.sensitivity_error:
 
 ui.notes([
     "Covariance: Ledoit-Wolf shrinkage of daily simple returns, annualised ×252.",
-    "Expected returns: arithmetic mean daily return ×252 — the noisiest input of mean-variance optimisation.",
+    "Return input: historical average (arithmetic mean daily return ×252), used by the optimiser as its estimate of "
+    "expected return — the noisiest input of mean-variance optimisation.",
     "Constraints: long-only, fully invested; custom bounds apply only to the custom portfolio. The frontier and "
     "the standard strategies use 0–100% bounds; equal weight ignores constraints by definition.",
     "No look-ahead: estimates use only returns up to the last date shown.",

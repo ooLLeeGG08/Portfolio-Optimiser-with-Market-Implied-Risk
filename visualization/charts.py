@@ -81,7 +81,7 @@ def rolling_vol_chart(df: pd.DataFrame, title: str = "Rolling realised volatilit
 
 def efficient_frontier_chart(points: pd.DataFrame, random: pd.DataFrame, strategies) -> go.Figure:
     f = _fig("Efficient frontier (in-sample estimates)", "Annualised volatility (%)",
-             "Expected annual return (%)", height=460)
+             "Historical average annual return (%)", height=460)
     f.add_trace(go.Scatter(x=random.volatility, y=random.expected_return, mode="markers",
                            name="Random long-only portfolios",
                            marker=dict(size=4, color=random.sharpe, colorscale=[[0, "#2A2A2D"], [1, T.ACCENT_SOFT]], opacity=0.55,
@@ -115,7 +115,7 @@ def weights_chart(strategies, title: str = "Asset allocation by strategy") -> go
 
 
 def sensitivity_chart(summary: pd.DataFrame) -> go.Figure:
-    f = _fig("Max-Sharpe weights under expected-return estimation error", None, "Weight (%)")
+    f = _fig("Max-Sharpe weights under return estimation error", None, "Weight (%)")
     f.add_trace(go.Bar(x=summary.index, y=summary["point_estimate"], name="Point estimate",
                        marker_color=T.ACCENT))
     f.add_trace(go.Scatter(x=summary.index, y=summary["mean"], mode="markers", name="Mean of resamples (5–95% range)",

@@ -128,7 +128,7 @@ def frontier(points: pd.DataFrame, random: pd.DataFrame, strategies) -> io.Bytes
                    label=s.strategy.value)
     ax.set_title("Efficient frontier (in-sample estimates)")
     ax.set_xlabel("Annualised volatility (%)")
-    ax.set_ylabel("Expected annual return (%)")
+    ax.set_ylabel("Historical average annual return (%)")
     ax.xaxis.set_major_formatter(PCT)
     ax.yaxis.set_major_formatter(PCT)
     fig.colorbar(sc, ax=ax, fraction=0.03, pad=0.02, label="Sharpe ratio")

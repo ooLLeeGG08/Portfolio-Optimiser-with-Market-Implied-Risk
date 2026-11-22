@@ -337,7 +337,7 @@ def performance(rd: ReportData) -> list:
 def optimisation(rd: ReportData) -> list:
     oa = rd.oa
     tab = comparison_table(oa.results)
-    rows = [[n, pct(r["Expected return (ann.)"]), pct(r["Excess return over risk-free (ann.)"]),
+    rows = [[n, pct(r["Historical average return (ann.)"]), pct(r["Excess return over risk-free (ann.)"]),
              pct(r["Volatility (ann.)"]), num(r["Sharpe ratio"])] for n, r in tab.iterrows()]
     wcols = [c for c in tab.columns if c.startswith("w[")]
     wrows = [[n] + [pct(r[c]) for c in wcols] for n, r in tab.iterrows()]
@@ -346,8 +346,9 @@ def optimisation(rd: ReportData) -> list:
           f"overstate achievable performance. Estimation window {date(oa.inputs.start)} – {date(oa.inputs.end)}; "
           f"Ledoit–Wolf shrinkage {oa.inputs.cov.shrinkage:.3f}; risk-free rate {pct(oa.inputs.risk_free_rate, 2)}. "
           f"{tag(RiskBasis.OBSERVED)}"),
-        table(rows, ["Strategy", "Expected return", "Excess over risk-free", "Volatility", "Sharpe"]),
-        P("Expected return is the total annualised arithmetic mean; Sharpe = excess return / volatility.", "small"),
+        table(rows, ["Strategy", "Hist. avg. return", "Excess over risk-free", "Volatility", "Sharpe"]),
+        P("Historical average return is the total annualised arithmetic mean over the estimation window, a description of "
+          "the past rather than a forecast; Sharpe = excess return / volatility.", "small"),
         P("Weights", "h2"),
         table(wrows, ["Strategy"] + [c[2:-1] for c in wcols],
               [1.5 * inch] + [(FRAME_W - 1.5 * inch) / len(wcols)] * len(wcols)),
@@ -358,12 +359,12 @@ def optimisation(rd: ReportData) -> list:
         sm = oa.sensitivity.summary
         se = oa.inputs.mu_standard_error
         out += [P("Sensitivity of maximum-Sharpe weights to estimation error", "h2"),
-                P(f"Expected returns were redrawn {oa.sensitivity.n_requested} times from N(μ̂, Σ/years) and the "
+                P(f"Historical average returns were redrawn {oa.sensitivity.n_requested} times from N(μ̂, Σ/years) and the "
                   f"maximum-Sharpe portfolio re-solved each time. Wide ranges mean the optimal weights are not "
                   f"statistically well determined."),
                 table([[t, pct(oa.inputs.mu[t]), pct(se[t]), pct(r.point_estimate), pct(r["mean"]), pct(r.p05), pct(r.p95)]
                        for t, r in sm.iterrows()],
-                      ["Asset", "Expected return", "Std. error", "Point weight", "Mean weight", "5th pct", "95th pct"])]
+                      ["Asset", "Hist. avg. return", "Std. error", "Point weight", "Mean weight", "5th pct", "95th pct"])]
     return out
 
 
