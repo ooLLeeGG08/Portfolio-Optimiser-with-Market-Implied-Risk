@@ -106,6 +106,8 @@ fb = state.forecasts()
 if fb is None:
     st.caption("GARCH and LSTM forecasts not computed yet — comparing historical and implied only.")
     st.page_link("views/forecasting.py", label="Run volatility forecasts", icon=":material/play_arrow:")
+else:
+    ui.precomputed_note(fb)
 cmp = pd.DataFrame(index=list(ib.estimates))
 for d in ib.disagreement:
     for lab, val in d.estimates.items():
@@ -129,6 +131,8 @@ if fb is not None and "SPY" in fb.studies and ib.vix_frame is not None:
 # --- disagreement ---------------------------------------------------------------------------------
 ui.section("disagreement indicator", "Volatility")
 st.warning(VDI_DISCLAIMER, icon=":material/info:")
+if fb is not None and fb.precomputed:
+    st.caption(f"GARCH and LSTM columns: {ui.precomputed_text(fb)} Option-implied and historical columns are live.")
 tab = disagreement_table(ib.disagreement)
 pct_cols = [c for c in tab.columns if c not in ("Disagreement", "Dispersion (all)", "Dispersion (models)", "IV / mean forecast")]
 cfg = ui.pct_columns(tab, pct_cols)

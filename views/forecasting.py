@@ -23,29 +23,40 @@ ui.basis_line(RiskBasis.OBSERVED, note="Trailing realised volatility, same defin
 ui.chart(charts.rolling_vol_chart(pa.rolling_vol))
 
 fb = state.forecasts()
+running = state.pending("fc") is not None
+
+
+def run_controls(label: str, primary: bool) -> None:
+    """Run button with resume-on-reset: the click records a job marker in the URL and ends the run,
+    so the browser holds the marker before the long job starts; a reconnect mid-run then continues
+    the job by itself (finished assets are cached)."""
+    if running:
+        st.info("Running the forecasts. If the connection resets, the run continues by itself; finished "
+                "assets are kept.", icon=":material/autorenew:")
+    if st.button(label, type="primary" if primary else "secondary", icon=":material/play_arrow:", disabled=running):
+        state.mark_pending("fc")
+        st.rerun()
+    if running:
+        state.run_forecasts()
+        state.clear_pending("fc")
+        st.rerun()
+
+
+run_caption = (f"Fits GARCH and trains one LSTM per asset plus the portfolio on up to "
+               f"{mb.settings.forecast_history_years} years of data, then evaluates all models on a locked "
+               f"out-of-sample window. Takes about {15 * (len(mb.spec.tickers) + 1) // 60 + 1} minutes; "
+               f"results are kept for the rest of the day.")
 if fb is None:
     with st.container(border=True):
         st.markdown("**Model forecasts have not been computed for this portfolio yet.**")
-        st.caption(f"Fits GARCH and trains one LSTM per asset plus the portfolio on up to "
-                   f"{mb.settings.forecast_history_years} years of data, then evaluates all models on a locked "
-                   f"out-of-sample window. Takes about {15 * (len(mb.spec.tickers) + 1) // 60 + 1} minutes; "
-                   f"results are kept for the rest of the day.")
-        running = state.pending("fc") is not None
-        if running:
-            st.info("Running the forecasts. If the connection resets, the run continues by itself; finished "
-                    "assets are kept.", icon=":material/autorenew:")
-        clicked = st.button("Run volatility forecasts", type="primary", icon=":material/play_arrow:",
-                            disabled=running)
-        if clicked:
-            # Record the request in the URL first and end this run, so the browser holds the marker
-            # before the long job starts; a reconnect mid-run then continues the job by itself.
-            state.mark_pending("fc")
-            st.rerun()
-        if running:
-            state.run_forecasts()
-            state.clear_pending("fc")
-            st.rerun()
+        st.caption(run_caption)
+        run_controls("Run volatility forecasts", primary=True)
     st.stop()
+if fb.precomputed:
+    ui.precomputed_note(fb)
+    with st.expander("Recompute with today's data", expanded=running):
+        st.caption(run_caption)
+        run_controls("Run volatility forecasts now", primary=False)
 state.clear_pending("fc")
 
 for name, err in fb.failures.items():
@@ -96,13 +107,10 @@ with right:
     st.subheader("LSTM training")
     ls = study.lstm
     ui.chart(charts.training_chart(ls.history, ls.best_epoch))
-    seg = ls.prep.segments
+    spans = ls.segment_spans()
     cfg = ls.cfg
     st.dataframe(pd.DataFrame({"Value": [
-        f"{seg.train[0]:%Y-%m-%d} – {seg.train[-1]:%Y-%m-%d} ({len(seg.train):,})",
-        f"{seg.val[0]:%Y-%m-%d} – {seg.val[-1]:%Y-%m-%d} ({len(seg.val):,})",
-        f"{seg.cal[0]:%Y-%m-%d} – {seg.cal[-1]:%Y-%m-%d} ({len(seg.cal):,})",
-        f"{seg.test[0]:%Y-%m-%d} – {seg.test[-1]:%Y-%m-%d} ({len(seg.test):,})",
+        *[f"{a:%Y-%m-%d} – {b:%Y-%m-%d} ({n:,})" for a, b, n in (spans[k] for k in ("train", "val", "cal", "test"))],
         f"{cfg.seq_len} days, {cfg.hidden_size} units × {cfg.num_layers} layer, dropout {cfg.dropout}",
         f"epoch {ls.best_epoch} of {len(ls.history)} (patience {cfg.patience})",
         f"{ls.conformal_adjustment:+.3f} (log-vol units)",

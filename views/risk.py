@@ -84,6 +84,8 @@ except ValueError as exc:
     st.error(str(exc))
     st.stop()
 ui.basis_line(fr.tail_risk[0].basis, note=f" {fr.covariance.vols.description}; correlations: {fr.covariance.correlation_source}.")
+if src in ("GARCH(1,1)", "LSTM") and fb.precomputed:
+    st.caption(ui.precomputed_text(fb))
 
 compare = []
 for s in available:

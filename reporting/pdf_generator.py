@@ -461,6 +461,11 @@ def vol_forecasts(rd: ReportData) -> list:
               f"{date(lt['As of'].iloc[0])}. Historical 60-day volatility is {tag(RiskBasis.OBSERVED)}; GARCH and LSTM are "
               f"{tag(RiskBasis.FORECAST)} with 10–90% intervals (GARCH: simulation; LSTM: conformally calibrated)."),
             table(rows, ["Series", "Historical 60d", "GARCH(1,1)", "GARCH 10–90%", "LSTM", "LSTM 10–90%"])]
+    if fb.precomputed:
+        meta = fb.precomputed
+        out.append(P(f"These forecasts were precomputed on {date(pd.Timestamp(meta['generated_at']))} "
+                     f"(prices to {date(pd.Timestamp(meta['data_as_of']))}) by the scheduled refresh, not at report time.",
+                     "small"))
     for n, e in fb.failures.items():
         out.append(P(f"{E(n)}: forecasting failed — {E(e)}", "small"))
     cmp = pd.DataFrame({"Historical 60d": lt["Historical 60d"], "GARCH(1,1)": lt["GARCH(1,1)"], "LSTM": lt["LSTM"]}).astype(float)

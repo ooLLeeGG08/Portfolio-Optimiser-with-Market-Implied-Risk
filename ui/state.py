@@ -13,6 +13,7 @@ from datetime import date
 import streamlit as st
 
 from app_core import pipeline as pl
+from app_core import precomputed as pc
 from core.types import RebalanceFrequency
 from data.market_data import MarketDataService
 from portfolio.optimization import Constraints
@@ -196,8 +197,21 @@ def _portfolio_study(s: pl.AnalysisSettings, d: str):
                                 VolStudyConfig(horizon=s.horizon_days))
 
 
+@st.cache_resource(show_spinner=False, ttl=3600)
+def _precomputed() -> pl.ForecastBundle | None:
+    return pc.load_snapshot(pc.PRECOMPUTED_DIR / pc.DEFAULT_NAME)
+
+
 def forecasts() -> pl.ForecastBundle | None:
-    return _forecast_store().get((settings(), day()))
+    """Forecasts computed in this session for the current portfolio; otherwise, for the default
+    portfolio, the precomputed ones (``fb.precomputed`` holds their date)."""
+    s = settings()
+    fb = _forecast_store().get((s, day()))
+    if fb is None:
+        snap = _precomputed()
+        if snap is not None and pc.settings_match(snap.precomputed["settings"], s):
+            return snap
+    return fb
 
 
 def run_forecasts() -> pl.ForecastBundle:

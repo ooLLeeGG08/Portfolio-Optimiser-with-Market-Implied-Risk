@@ -42,6 +42,7 @@ if fb is None:
     st.caption("Volatility forecasts have not been computed yet.")
     st.page_link("views/forecasting.py", label="Run volatility forecasts", icon=":material/play_arrow:")
     st.stop()
+ui.precomputed_note(fb)
 
 summary = []
 for name, sres in fb.studies.items():

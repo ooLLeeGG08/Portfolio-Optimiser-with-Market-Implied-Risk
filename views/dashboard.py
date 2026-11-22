@@ -86,10 +86,11 @@ cards.append(lambda: ui.kpi("Historical (60-day)", ui.pct(hist60), RiskBasis.OBS
                             help="Trailing 60-day realised volatility."))
 if fb is not None and "Portfolio" in fb.studies:
     L = fb.studies["Portfolio"].latest
+    src = f" {ui.precomputed_text(fb)}" if fb.precomputed else ""
     cards.append(lambda: ui.kpi("GARCH(1,1) forecast", ui.pct(L.loc["GARCH(1,1)", "point"]), RiskBasis.FORECAST,
-                                help=f"10–90% interval {ui.pct(L.loc['GARCH(1,1)', 'lower'])} – {ui.pct(L.loc['GARCH(1,1)', 'upper'])}."))
+                                help=f"10–90% interval {ui.pct(L.loc['GARCH(1,1)', 'lower'])} – {ui.pct(L.loc['GARCH(1,1)', 'upper'])}.{src}"))
     cards.append(lambda: ui.kpi("LSTM forecast", ui.pct(L.loc["LSTM", "point"]), RiskBasis.FORECAST,
-                                help=f"Calibrated 10–90% interval {ui.pct(L.loc['LSTM', 'lower'])} – {ui.pct(L.loc['LSTM', 'upper'])}."))
+                                help=f"Calibrated 10–90% interval {ui.pct(L.loc['LSTM', 'lower'])} – {ui.pct(L.loc['LSTM', 'upper'])}.{src}"))
 else:
     def _todo():
         with ui.card():
@@ -120,5 +121,7 @@ else:
 for col, card in zip(st.columns(4), cards):
     with col:
         card()
+if fb is not None and fb.precomputed:
+    st.caption(f"GARCH and LSTM cards: {ui.precomputed_text(fb)}")
 
 ui.quality_panel(mb.quality)

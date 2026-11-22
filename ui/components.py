@@ -154,6 +154,31 @@ def badge(basis: RiskBasis | None, text: str | None = None) -> str:
     return f'<span class="pi-badge" style="{style}" title="{basis.label}">{text or T.BASIS_SHORT[basis]}</span>'
 
 
+STALE_AFTER_DAYS = 4  # refreshed every weekday; older files (beyond a long weekend) mean the refresh is failing
+
+
+def precomputed_text(fb) -> str | None:
+    """'Precomputed on …' label for forecasts loaded from the precomputed files, else None."""
+    meta = getattr(fb, "precomputed", None)
+    if not meta:
+        return None
+    gen, asof = pd.Timestamp(meta["generated_at"]), pd.Timestamp(meta["data_as_of"])
+    return f"Precomputed on {gen:%d %b %Y} (prices to {asof:%d %b %Y}) for the default portfolio."
+
+
+def precomputed_note(fb) -> None:
+    """Show where forecasts came from when they were not computed in this session."""
+    text = precomputed_text(fb)
+    if text is None:
+        return
+    age = (pd.Timestamp.now(tz="UTC") - pd.Timestamp(fb.precomputed["generated_at"])).days
+    if age > STALE_AFTER_DAYS:
+        st.warning(f"{text} This copy is {age} days old; run the forecasts again for current results.",
+                   icon=":material/history:")
+    else:
+        st.caption(f":material/schedule: {text} Refreshed automatically after each US trading day.")
+
+
 def basis_line(*bases: RiskBasis, note: str = "") -> None:
     st.markdown(" ".join(badge(b) for b in bases) + (f'<span class="pi-note">{note}</span>' if note else ""),
                 unsafe_allow_html=True)
