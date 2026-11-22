@@ -156,7 +156,7 @@ def return_distribution_chart(returns: pd.Series, var95: float, var99: float) ->
 
 def correlation_stress_chart(profile: pd.DataFrame, base_basis: RiskBasis) -> go.Figure:
     f = _fig("Portfolio volatility as correlations converge (hypothetical)",
-             "Correlation stress λ (0 = historical, 1 = all correlations = 1)", "Annualised volatility (%)",
+             "Correlation stress λ (0 = historical, 1 = perfect)", "Annualised volatility (%)",
              height=320)
     f.add_trace(go.Scatter(x=profile["lambda"], y=profile["portfolio_volatility"], mode="lines+markers",
                            name="Portfolio volatility", line=dict(color=T.BASIS_COLORS[RiskBasis.HYPOTHETICAL])))
