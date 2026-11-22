@@ -74,9 +74,15 @@ with right:
 
 # --- forward-looking -----------------------------------------------------------------------------
 ui.section("forward-looking risk", "Volatility-adjusted")
-st.markdown("Each asset's volatility is replaced by an alternative estimate and combined with historical "
-            "correlations: **Σ = D·R·D**. Correlations are not re-estimated, so the stress slider below shows what "
-            "happens if they rise, as they typically do in market stress.")
+st.markdown("What if each asset's volatility were a forecast or an option-market estimate instead of its past "
+            "level? The slider shows what happens when assets start moving together, as they usually do in a crisis.")
+ui.methodology([
+    "**Covariance from parts.** Σ = D·R·D, where D is a diagonal matrix of each asset's volatility from the chosen "
+    "source and R is the historical correlation matrix. Only the volatilities change; correlations are not re-estimated.",
+    "**Correlation stress.** R_λ = (1 − λ)·R + λ·11ᵀ: λ = 0 keeps historical correlations, λ = 1 makes every pair "
+    "perfectly correlated (no diversification). The result is a valid correlation matrix for every λ.",
+    "**Forward VaR.** Parametric (normal) VaR and CVaR from Σ with zero expected return.",
+])
 fb, ib = state.forecasts(), state.implied(fetch=False)
 available = ["Historical 60d"] + (["GARCH(1,1)", "LSTM"] if fb is not None else []) + (["Implied"] if ib is not None else [])
 if len(available) < len(VOL_SOURCES):

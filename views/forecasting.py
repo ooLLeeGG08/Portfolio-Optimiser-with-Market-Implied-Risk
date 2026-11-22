@@ -13,10 +13,14 @@ h = mb.settings.horizon_days
 ui.header("forecasting", dim="Volatility", subtitle=
           f"Historical, GARCH(1,1) and LSTM forecasts of realised volatility over the next {h} trading days.")
 
-st.markdown(
-    f"**Target.** Every model forecasts the same quantity: annualised realised volatility over the next {h} "
-    f"trading days, √(252/{h} · Σ r²) of daily log returns. Forecasts made at the close of day *t* use data up "
-    f"to *t* only.")
+st.markdown(f"Every model answers the same question: how much will prices swing over the next {h} trading days?")
+ui.methodology([
+    f"**Target.** Annualised realised volatility over the next {h} trading days: RV = √(252/{h} · Σ r²), "
+    f"the sum of squared daily log returns r over days t+1 … t+{h}.",
+    f"**No look-ahead.** A forecast made at the close of day *t* uses data up to *t* only.",
+    "**Same yardstick.** Historical volatility uses the same formula over the past window, so all models are "
+    "compared on one definition.",
+])
 
 ui.section("historical volatility", "Rolling")
 ui.basis_line(RiskBasis.OBSERVED, note="Trailing realised volatility, same definition as the forecast target.")

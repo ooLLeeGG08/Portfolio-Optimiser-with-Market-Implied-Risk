@@ -254,6 +254,11 @@ def kpi(label: str, value: str, basis: RiskBasis | None = None, help: str | None
             st.markdown(f'<div class="pi-kpi-basis">{badge(basis)}</div>', unsafe_allow_html=True)
 
 
+def methodology(items) -> None:
+    """Formulas and definitions, collapsed so the page leads with results."""
+    notes(items, title="Methodology", expanded=False)
+
+
 def notes(items, title: str = "Assumptions and notes", expanded: bool = False) -> None:
     items = [i for i in items if i]
     if not items:
