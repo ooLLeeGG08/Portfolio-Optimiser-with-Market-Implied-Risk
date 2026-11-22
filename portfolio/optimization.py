@@ -317,6 +317,37 @@ def comparison_table(results: list[OptimizedPortfolio]) -> pd.DataFrame:
     return pd.DataFrame(rows).T
 
 
+def identical_strategy_notes(results: list[OptimizedPortfolio], constraints: Constraints = Constraints(),
+                             tol: float = 1e-4) -> list[str]:
+    """Explain rows of the comparison that have the same weights as an earlier row, so identical
+    numbers do not look like a bug. Built from the results and constraints, nothing assumed."""
+    notes: list[str] = []
+    seen: list[OptimizedPortfolio] = []
+    for r in results:
+        twin = next((s for s in seen if s.weights.index.equals(r.weights.index)
+                     and float((s.weights - r.weights).abs().max()) <= tol), None)
+        seen.append(r)
+        if twin is None:
+            continue
+        w = r.weights
+        if r.strategy is Strategy.CUSTOM:
+            lo = [b[0] for b in constraints.bounds(list(w.index))]
+            hi = [b[1] for b in constraints.bounds(list(w.index))]
+            if len(set(hi)) == 1 and len(set(lo)) == 1:
+                limits = f"{lo[0]:.0%}–{hi[0]:.0%} per asset"
+            else:
+                limits = "per-asset"
+            notes.append(f"{r.strategy.value}: the {limits} limits do not bind (largest weight "
+                         f"{w.max():.1%}, smallest {w.min():.1%}), so it is the same portfolio as {twin.strategy.value}.")
+        elif r.strategy is Strategy.USER and twin.strategy is Strategy.EQUAL_WEIGHT:
+            notes.append(f"{r.strategy.value}: the current portfolio holds all {len(w)} assets at {w.iloc[0]:.2%} "
+                         f"each, so it is the same as {twin.strategy.value}. Set your own weights in the Portfolio "
+                         f"Builder to compare a different portfolio.")
+        else:
+            notes.append(f"{r.strategy.value} has the same weights as {twin.strategy.value}.")
+    return notes
+
+
 # --- sensitivity -------------------------------------------------------------------------
 
 @dataclass(frozen=True)

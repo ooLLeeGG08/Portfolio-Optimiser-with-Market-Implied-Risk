@@ -243,3 +243,21 @@ def test_sensitivity_is_reproducible_and_valid(inputs):
     assert (a.summary["p05"] <= a.summary["p95"] + 1e-12).all()
     # Standard error of annualised mean: sigma / sqrt(years), years = 1260 / 252 = 5.
     np.testing.assert_allclose(inputs.mu_standard_error, np.array([0.10, 0.15, 0.20, 0.28]) / np.sqrt(5))
+
+
+def test_identical_strategy_notes_come_from_the_data(inputs):
+    from portfolio.optimization import compare_strategies, identical_strategy_notes
+    n = len(inputs.tickers)
+    ew = pd.Series(1 / n, index=inputs.tickers)
+    # A 100% cap cannot bind, so Custom = Maximum Sharpe; equal user weights = Equal weight.
+    loose = Constraints(0.0, 1.0)
+    res, _ = compare_strategies(inputs, loose, ew, "max_sharpe")
+    notes = identical_strategy_notes(res, loose)
+    assert any(x.startswith("Custom (constrained): the 0%–100% per asset limits do not bind") and
+               "same portfolio as Maximum Sharpe" in x for x in notes)
+    assert any(x.startswith("User-defined:") and f"{1 / n:.2%}" in x for x in notes)
+    # A cap tighter than the largest max-Sharpe weight binds: no note for Custom.
+    ms = next(r for r in res if r.strategy.value == "Maximum Sharpe")
+    tight = Constraints(0.0, round(float(ms.weights.max()) - 0.05, 2))
+    res2, _ = compare_strategies(inputs, tight, ew * 0 + np.linspace(1, 2, n) / np.linspace(1, 2, n).sum(), "max_sharpe")
+    assert identical_strategy_notes(res2, tight) == []

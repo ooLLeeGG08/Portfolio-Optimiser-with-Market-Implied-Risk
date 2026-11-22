@@ -3,7 +3,7 @@ import streamlit as st
 
 from app_core.pipeline import AnalysisSettings
 from core.types import RiskBasis
-from portfolio.optimization import Strategy, comparison_table
+from portfolio.optimization import Strategy, comparison_table, identical_strategy_notes
 from ui import components as ui
 from ui import state
 from visualization import charts
@@ -43,6 +43,8 @@ metric_cols = ["Expected return (ann.)", "Excess return over risk-free (ann.)", 
 cfg = ui.pct_columns(tab, metric_cols[:3])
 cfg["Sharpe ratio"] = st.column_config.NumberColumn(format="%.2f")
 st.dataframe(tab[metric_cols], width="stretch", column_config=cfg)
+for n in identical_strategy_notes(oa.results, oa.constraints):
+    st.caption(f":material/info: {n}")
 weights = tab[[c for c in tab.columns if c.startswith("w[")]].rename(columns=lambda c: c[2:-1])
 st.markdown("**Weights**")
 st.dataframe(weights, width="stretch", column_config=ui.pct_columns(weights, weights.columns))
