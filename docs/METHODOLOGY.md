@@ -409,6 +409,17 @@ snapshot only — no history is available from this provider).
   ask > bid; (ask − bid)/mid ≤ 50 %; open interest ≥ 10; last trade within 5 calendar days;
   expiry ≥ 7 calendar days (ATM/term structure); |ln(K/F)| ≤ 0.5; price within no-arbitrage
   bounds; 1 % ≤ IV ≤ 300 %. Typically only 30–50 % of listed quotes survive.
+- *Smile outlier rule* (applied last): within an expiry, a quote is excluded when its IV differs by
+  more than 25 % (relative) from the median IV of the out-of-the-money quotes at the nearest 2
+  strikes below and 2 above (the quote itself excluded; at least 3 reference quotes with one on
+  each side, otherwise the quote is never flagged). The OTM quotes are the reference because they
+  are the ones used for ATM IV; in-the-money quotes are less liquid and carry an early-exercise
+  premium that Black-76 ignores, which shows up as isolated spikes (e.g. an AAPL put at strike 395
+  with IV ≈ 35 % against ≈ 24 % at the neighbouring strikes, 20 Nov 2026). A median follows a steep
+  but smooth skew, so only isolated departures are flagged. The 25 % threshold is a fixed round
+  number, not fitted; excluded quotes are counted under their own reason. On the 20 Nov 2026
+  snapshot of the default assets it removed only in-the-money quotes, so ATM and horizon IVs were
+  unchanged.
 - *ATM IV per expiry:* from out-of-the-money options only (puts K < F, calls K ≥ F — smallest
   early-exercise premium; Black-76 is a European model and listed equity options are
   American, an approximation that is stated), linear interpolation in log-moneyness

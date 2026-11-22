@@ -47,6 +47,11 @@ class QuoteFilters:
     max_iv: float = 3.0
     min_days_to_expiry: int = 7  # very short expiries are excluded from ATM/term structure
     max_abs_log_moneyness: float = 0.5
+    # Smile outlier rule (see smile_outliers): a quote whose IV differs by more than this fraction
+    # from the median IV of the out-of-the-money quotes at the nearest `smile_neighbours` strikes on
+    # each side (same expiry) is excluded. Applied after all other filters.
+    smile_outlier_rel: float = 0.25
+    smile_neighbours: int = 2
 
 
 # --- Black-76 ----------------------------------------------------------------------------------
@@ -107,6 +112,33 @@ class ChainAnalysis:
         return self.expiries.dropna(subset=["atm_iv"])[["T_days", "atm_iv", "n_valid"]]
 
 
+def smile_outliers(q: pd.DataFrame, max_rel: float = 0.25, neighbours: int = 2) -> pd.Series:
+    """True for quotes whose IV is more than ``max_rel`` (relative) away from the out-of-the-money
+    smile at nearby strikes.
+
+    Reference: within the same expiry, the median IV of the out-of-the-money quotes at the nearest
+    ``neighbours`` strikes below and above (the quote itself excluded). OTM quotes are the reference
+    because they are the ones used for ATM / term-structure IV; in-the-money quotes are less liquid
+    and carry an early-exercise premium that Black-76 ignores, which shows up as isolated spikes.
+    A median follows a steep but smooth wing, so only isolated departures are flagged. A quote
+    needs at least 3 reference quotes, with one on each side, or it is never flagged.
+    Expects columns expiry, strike, iv, otm.
+    """
+    flag = pd.Series(False, index=q.index)
+    for _, g in q.groupby("expiry"):
+        ref = g[g.otm].sort_values("strike")
+        for idx, row in g.iterrows():
+            r = ref[ref.index != idx]
+            below = r[r.strike < row.strike].iv.to_numpy()[-neighbours:]
+            above = r[r.strike > row.strike].iv.to_numpy()[:neighbours]
+            same = r[r.strike == row.strike].iv.to_numpy()
+            nb = np.r_[below, same, above]
+            if len(below) and len(above) and len(nb) >= 3:
+                med = float(np.median(nb))
+                flag[idx] = med > 0 and abs(row.iv / med - 1) > max_rel
+    return flag
+
+
 def _forward(q: pd.DataFrame, spot: float, T: float, r: float) -> tuple[float, str]:
     calls = q[(q.type == "call") & q.quote_ok].set_index("strike")["mid"]
     puts = q[(q.type == "put") & q.quote_ok].set_index("strike")["mid"]
@@ -163,6 +195,9 @@ def analyze_chain(raw: OptionChainRaw, risk_free_rate: float,
     q["iv"] = ivs
     require(q.iv.notna(), "price outside no-arbitrage bounds")
     require((q.iv >= filters.min_iv) & (q.iv <= filters.max_iv), "implausible implied volatility")
+    out = smile_outliers(q.loc[reason == "", ["expiry", "strike", "iv", "otm"]],
+                         filters.smile_outlier_rel, filters.smile_neighbours)
+    reason[out[out].index] = f"smile outlier (IV >{filters.smile_outlier_rel:.0%} from nearby strikes)"
     q["exclusion_reason"] = reason
     q["valid"] = reason == ""
     q.loc[~q.valid, "iv"] = np.nan

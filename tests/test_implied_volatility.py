@@ -95,6 +95,37 @@ def test_filters_exclude_bad_quotes_with_reasons():
     assert ch.exclusions.sum() >= 5
 
 
+def _repriced(chain: OptionChainRaw, strike: float, kind: str, days: int, vol: float) -> OptionChainRaw:
+    """Replace one quote's price with the price at a different volatility (an isolated spike)."""
+    q = chain.quotes.copy()
+    T = days / 365
+    F = SPOT * np.exp((R - Q) * T)
+    p = float(black76_price(F, strike, T, R, vol, kind))
+    m = (q.strike == strike) & (q.type == kind)
+    q.loc[m, ["bid", "ask", "last"]] = [p * 0.99, p * 1.01, p]
+    return OptionChainRaw(chain.ticker, chain.spot, chain.quote_time, q, chain.source)
+
+
+def test_smile_outlier_is_excluded_with_reason():
+    # An in-the-money put at 35% IV in a 25% smile: the AAPL case. Its neighbours are OTM calls.
+    ch = analyze_chain(_repriced(make_chain({30: 0.25}), 110.0, "put", 30, 0.35), R)
+    q = ch.quotes.set_index(["strike", "type"])
+    assert q.loc[(110.0, "put"), "exclusion_reason"].startswith("smile outlier")
+    assert not q.loc[(110.0, "put"), "valid"]
+    assert q.loc[(110.0, "call"), "valid"]  # the same strike's call is untouched
+    assert any(r.startswith("smile outlier") for r in ch.exclusions.index)
+
+
+def test_smooth_steep_smile_is_not_flagged():
+    # Steep but smooth skew (IV rising 1.5 points per strike step on the downside): nothing flagged.
+    chain = make_chain({30: 0.25})
+    for K in np.arange(80, 100, 2.5):
+        for kind in ("call", "put"):
+            chain = _repriced(chain, float(K), kind, 30, 0.25 + 0.006 * (100 - K))
+    ch = analyze_chain(chain, R)
+    assert not ch.quotes.exclusion_reason.str.startswith("smile outlier").any()
+
+
 def test_short_expiry_excluded_and_flat_extrapolation_flagged():
     ch = analyze_chain(make_chain({3: 0.4, 90: 0.22, 120: 0.22}), R)
     assert np.isnan(ch.expiries.iloc[0].atm_iv)  # 3-day expiry filtered out
