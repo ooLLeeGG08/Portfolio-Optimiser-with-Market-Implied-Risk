@@ -1,0 +1,52 @@
+# Recomputes the default portfolio's volatility forecasts after each US trading day and commits the
+# files in precomputed/. The push triggers a Vercel redeploy, so the hosted app shows them on first visit.
+# No secrets are used: yfinance needs no key, and the push uses the workflow's own GITHUB_TOKEN.
+name: Refresh precomputed forecasts
+
+on:
+  schedule:
+    - cron: "30 22 * * 1-5"  # 22:30 UTC Mon-Fri, after the 16:00 New York close
+  workflow_dispatch:         # "Run workflow" button in the Actions tab
+
+permissions:
+  contents: write            # needed to push the refreshed files
+
+concurrency:
+  group: refresh-forecasts
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-vercel.txt
+
+      # Same pinned, CPU-only dependencies as the hosted container.
+      - name: Install dependencies
+        run: pip install -r requirements-vercel.txt
+
+      - name: Compute forecasts
+        env:
+          PI_CACHE_DIR: ${{ runner.temp }}/pi-cache
+          OMP_NUM_THREADS: "1"
+        run: python scripts/precompute_forecasts.py
+
+      - name: Commit refreshed files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add precomputed
+          if git diff --cached --quiet; then
+            echo "No changes."
+            exit 0
+          fi
+          git commit -m "Refresh precomputed forecasts ($(date -u +%Y-%m-%d))"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
