@@ -39,8 +39,10 @@ nav = st.navigation(pages)
 
 with st.sidebar:
     s = state.settings()
-    st.markdown('<div class="pi-eyebrow" style="font-size:0.68rem;margin-bottom:10px">Current portfolio</div>', unsafe_allow_html=True)
-    st.caption(", ".join(f"{t} {w:.0%}" for t, w in zip(s.tickers, s.weights)))
+    # A slot the Portfolio Builder redraws live while weights are being edited.
+    slot = st.empty()
+    st.session_state["_sidebar_portfolio_slot"] = slot
+    ui.sidebar_portfolio(slot, s.tickers, s.weights)
     st.markdown('<div class="pi-side-note">Data: Yahoo Finance via yfinance (free, may be delayed). '
                 'Not investment advice.</div>', unsafe_allow_html=True)
 

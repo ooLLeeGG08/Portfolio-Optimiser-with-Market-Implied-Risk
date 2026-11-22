@@ -260,5 +260,17 @@ def quality_panel(report: DataQualityReport, expanded: bool = False) -> None:
                        f"{report.n_aligned_observations:,} trading days. Missing prices are never filled.")
 
 
+def sidebar_portfolio(slot, tickers, weights, pending: bool = False) -> None:
+    """Draw the sidebar's 'Current portfolio' block into ``slot`` (replacing what was there).
+    ``pending`` marks weights that are edited in the Builder but not applied yet."""
+    with slot.container():
+        st.markdown('<div class="pi-eyebrow" style="font-size:0.68rem;margin-bottom:10px">Current portfolio</div>',
+                    unsafe_allow_html=True)
+        st.caption(", ".join(f"{t} {w:.0%}" for t, w in zip(tickers, weights) if t))
+        if pending:
+            st.markdown(f'<div class="pi-note" style="color:{T.ACCENT}">Edited, not applied yet. Click '
+                        f'<b>Apply portfolio</b> to analyse it.</div>', unsafe_allow_html=True)
+
+
 def pct_columns(df: pd.DataFrame, cols) -> dict:
     return {c: st.column_config.NumberColumn(c, format="percent") for c in cols if c in df}

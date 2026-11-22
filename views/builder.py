@@ -68,6 +68,16 @@ if changed:
     st.rerun()
 st.session_state["draft_current"] = table
 
+# Mirror the table in the sidebar as it is edited, flagged until the portfolio is applied.
+_draft = table.assign(Ticker=table["Ticker"].fillna("").str.strip().str.upper())
+_draft = _draft[_draft.Ticker != ""]
+_w = _draft["Weight (%)"].fillna(0).astype(float) / 100
+_applied = dict(zip(s.tickers, s.weights))
+_pending = (list(_draft.Ticker) != list(s.tickers)
+            or any(abs(w - _applied.get(t, -1)) > 5e-5 for t, w in zip(_draft.Ticker, _w)))
+if "_sidebar_portfolio_slot" in st.session_state:
+    ui.sidebar_portfolio(st.session_state["_sidebar_portfolio_slot"], list(_draft.Ticker), list(_w), _pending)
+
 if st.session_state.get("table_msg"):
     st.info(st.session_state.pop("table_msg"), icon=":material/balance:")
 w_total = float(table["Weight (%)"].fillna(0).sum())
