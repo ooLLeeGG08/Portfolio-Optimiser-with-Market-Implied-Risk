@@ -311,5 +311,34 @@ def download_link(data: bytes, file_name: str, mime: str, label: str) -> None:
                 f'<span aria-hidden="true">↓</span> {html.escape(label)}</a>', unsafe_allow_html=True)
 
 
+NOT_RUN = "not run yet"
+
+
+def gap_table(df: pd.DataFrame, formats: dict[str, str], reasons: pd.DataFrame | None = None,
+              default: str = "n/a", **kwargs) -> None:
+    """st.dataframe that writes a missing value as a muted, italic word instead of Streamlit's
+    "None": ``default`` ("n/a"), or the text in ``reasons`` (same index/columns as ``df``, e.g.
+    "not run yet") where one is given. ``formats`` maps the number columns to Python format strings
+    ("{:.2%}").
+
+    Streamlit's grid prints "None" for every null cell whatever a Styler says, so the formatted
+    columns are passed as text (right-aligned like numbers) and the empty cells are styled muted.
+    """
+    missing = df.isna()
+    shown = df.astype(object).copy()
+    for col, fmt in formats.items():
+        if col in df:
+            shown[col] = [default if m else fmt.format(v) for v, m in zip(df[col], missing[col])]
+    if reasons is not None:
+        r = reasons.reindex(index=df.index, columns=df.columns)
+        use = missing & r.notna()
+        shown = shown.mask(use, r)
+    shown = shown.mask(missing & shown.isna(), default)
+    css = missing.replace({True: f"color: {T.MUTED}; font-style: italic", False: ""})
+    cfg = {c: st.column_config.TextColumn(alignment="right") for c in formats if c in df}
+    cfg.update(kwargs.pop("column_config", {}) or {})
+    st.dataframe(shown.style.apply(lambda _: css, axis=None), column_config=cfg, **kwargs)
+
+
 def pct_columns(df: pd.DataFrame, cols) -> dict:
     return {c: st.column_config.NumberColumn(c, format="percent") for c in cols if c in df}

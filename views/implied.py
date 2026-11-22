@@ -61,11 +61,14 @@ for t, e in ib.estimates.items():
                             IVSource.PROXY: "PROXY ESTIMATE — not market data",
                             IVSource.UNAVAILABLE: "Unavailable"}[e.source],
                  "Reliable": "yes" if e.reliable else "limited",
-                 "Valid quotes": int(ib.chains[t].quotes.valid.sum()) if t in ib.chains else None,
-                 "Detail": e.detail})
-st.dataframe(pd.DataFrame(rows).set_index("Ticker"), width="stretch",
-             column_config={"Implied volatility": st.column_config.NumberColumn(format="percent"),
-                            "Detail": st.column_config.TextColumn(width="large")})
+                 "Valid quotes": float(ib.chains[t].quotes.valid.sum()) if t in ib.chains else None})
+iv_tab = pd.DataFrame(rows).set_index("Ticker")
+iv_tab[["Implied volatility", "Valid quotes"]] = iv_tab[["Implied volatility", "Valid quotes"]].astype(float)
+ui.gap_table(iv_tab, {"Implied volatility": "{:.2%}", "Valid quotes": "{:,.0f}"}, width="stretch")
+# The explanations are full sentences; a grid cell would cut them off, so they are listed in full here.
+with st.expander("How each estimate was made"):
+    for t, e in ib.estimates.items():
+        st.markdown(f"- **{t}**: {e.detail}")
 for n in ib.notes:
     st.caption(n)
 
@@ -134,11 +137,26 @@ st.warning(VDI_DISCLAIMER, icon=":material/info:")
 if fb is not None and fb.precomputed:
     st.caption(f"GARCH and LSTM columns: {ui.precomputed_text(fb)} Option-implied and historical columns are live.")
 tab = disagreement_table(ib.disagreement)
-pct_cols = [c for c in tab.columns if c not in ("Disagreement", "Dispersion (all)", "Dispersion (models)", "IV / mean forecast")]
-cfg = ui.pct_columns(tab, pct_cols)
-for c in ("Dispersion (all)", "Dispersion (models)", "IV / mean forecast"):
-    cfg[c] = st.column_config.NumberColumn(format="%.3f")
-st.dataframe(tab, width="stretch", column_config=cfg)
+for i, c in enumerate(("GARCH", "LSTM"), start=1):  # always shown, so a missing model is visible
+    if c not in tab:
+        tab.insert(i, c, float("nan"))
+ratio_cols = ("Dispersion (all)", "Dispersion (models)", "IV / mean forecast")
+num_cols = [c for c in tab.columns if c != "Disagreement"]
+tab[num_cols] = tab[num_cols].apply(pd.to_numeric, errors="coerce")
+formats = {c: "{:.3f}" if c in ratio_cols else ("{:.0%}" if c == "Model dispersion percentile" else "{:.2%}")
+           for c in num_cols}
+# Why a cell is empty: forecasts not run for this portfolio, or an implied proxy (no ratio by design).
+reasons = pd.DataFrame(index=tab.index, columns=tab.columns, dtype=object)
+if fb is None:
+    reasons[["GARCH", "LSTM", "Dispersion (models)", "IV / mean forecast", "Model dispersion percentile"]] = ui.NOT_RUN
+else:
+    for tk, e in ib.estimates.items():
+        if tk in reasons.index and e.source is IVSource.PROXY:
+            reasons.loc[tk, "IV / mean forecast"] = "proxy: not shown"
+ui.gap_table(tab, formats, reasons, width="stretch")
+if fb is None:
+    st.caption(f"“{ui.NOT_RUN}”: these columns need the GARCH and LSTM forecasts, which have not been run for this "
+               f"portfolio. “n/a”: no value applies.")
 ui.chart(charts.disagreement_chart(ib.disagreement))
 ui.notes([
     "Dispersion = standard deviation of the logs of the available estimates; 0.10 ≈ estimates spread ±10% around "

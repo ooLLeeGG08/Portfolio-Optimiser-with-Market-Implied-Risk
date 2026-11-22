@@ -38,15 +38,21 @@ st.markdown("**VaR** is a loss threshold: at 95%, the loss is expected to exceed
 hz = st.segmented_control("Horizon (trading days)", [1, 5, 10, 21], default=1, key="var_h") or 1
 est = pa.tail_risk if hz == 1 else tail_risk_at_horizon(mb, pa, hz)
 df = to_frame(est).drop(columns=["Horizon (days)", "Basis"])
-df.loc[df["VaR"].isna(), "Method"] = df.loc[df["VaR"].isna(), "Method"] + " — not reported (see notes)"
-show = df.assign(VaR=df.VaR * 100, CVaR=df.CVaR * 100)
-st.dataframe(show, hide_index=True, width="stretch", column_config={
-    "Confidence": st.column_config.NumberColumn(format="percent"),
-    "VaR": st.column_config.NumberColumn("VaR (% of value)", format="%.2f%%"),
-    "CVaR": st.column_config.NumberColumn("CVaR (% of value)", format="%.2f%%"),
-    "VaR amount": st.column_config.NumberColumn(format="dollar"),
-    "CVaR amount": st.column_config.NumberColumn(format="dollar"),
-    "Notes": st.column_config.TextColumn(width="large")})
+notes_by_method = df[["Method", "Confidence", "Notes"]]
+df.loc[df["VaR"].isna(), "Method"] = df.loc[df["VaR"].isna(), "Method"] + " — not reported (see notes below)"
+show = df.drop(columns="Notes").rename(columns={"VaR": "VaR (% of value)", "CVaR": "CVaR (% of value)"})
+ui.gap_table(show, {"Confidence": "{:.0%}", "VaR (% of value)": "{:.2%}", "CVaR (% of value)": "{:.2%}",
+                    "VaR amount": "${:,.0f}", "CVaR amount": "${:,.0f}"}, hide_index=True, width="stretch")
+# Notes are full sentences, listed below the table so they are never cut off. Sentences shared by both
+# confidence levels are shown once; the rest are prefixed with their confidence level.
+lines = []
+for method, g in notes_by_method.groupby("Method", sort=False):
+    per_row = [[s.strip().rstrip(".") + "." for s in str(n).split(". ") if s.strip()] for n in g["Notes"].fillna("")]
+    common = [s for s in per_row[0] if all(s in r for r in per_row)]
+    extra = [f"{c:.0%}: " + " ".join(s for s in r if s not in common) for c, r in zip(g["Confidence"], per_row)
+             if any(s not in common for s in r)]
+    lines.append(f"**{method}**: " + " ".join(common + extra))
+st.markdown("\n".join(f"- {x}" for x in lines))
 ui.basis_line(RiskBasis.OBSERVED, note=f" Portfolio value {ui.money(pa.current_value)}. "
               + ("" if hz == 1 else f"{hz}-day figures scale the 1-day estimates by √{hz} (assumes independent returns)."))
 h = {(e.method, e.confidence): e for e in pa.tail_risk}
