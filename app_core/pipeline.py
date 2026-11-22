@@ -306,6 +306,9 @@ class ForecastBundle:
     studies: dict[str, VolStudyResult]  # per asset + "Portfolio"
     failures: dict[str, str]
     latest: pd.DataFrame  # rows = series, columns = model point forecasts (+ intervals)
+    # Set when the bundle was loaded from the precomputed files instead of computed in this session:
+    # {"generated_at": UTC timestamp, "data_as_of": last price date, ...} (see app_core/precomputed.py).
+    precomputed: dict | None = None
 
     def vol_vector(self, model: str, tickers: list[str]) -> VolatilityVector:
         """Per-asset latest forecasts for D.R.D. model in {'Historical 60d','GARCH(1,1)','LSTM'}."""

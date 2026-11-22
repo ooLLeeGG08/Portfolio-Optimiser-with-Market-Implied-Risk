@@ -194,6 +194,12 @@ class TrainedLSTM:
     checkpoint_path: Path | None
     notes: list[str] = field(default_factory=list)
 
+    def segment_spans(self) -> dict[str, tuple[pd.Timestamp, pd.Timestamp, int]]:
+        """First date, last date and sample count of the train/val/cal/test segments."""
+        seg = self.prep.segments
+        return {k: (getattr(seg, k)[0], getattr(seg, k)[-1], len(getattr(seg, k)))
+                for k in ("train", "val", "cal", "test")}
+
     def predict(self, dates: pd.DatetimeIndex) -> pd.DataFrame:
         """Annualised vol forecasts for RV_{t,h}: point (median), raw and calibrated 10/90 %."""
         X = torch.from_numpy(make_sequences(self.prep, dates, self.cfg.seq_len))
