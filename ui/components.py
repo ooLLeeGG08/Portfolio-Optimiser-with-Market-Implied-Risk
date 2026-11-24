@@ -118,7 +118,7 @@ h3.pi-takeaway-title {{ margin: 0 0 0.35rem 0 !important; font-size: 0.95rem !im
     min-width: calc(50% - 0.4rem) !important; flex: 1 1 calc(50% - 0.4rem) !important; width: calc(50% - 0.4rem) !important; }}
 }}
 .pi-note {{ color: {T.MUTED}; font-size: 0.82rem; line-height: 1.45; }}
-.pi-kpi-basis {{ margin-top: -0.35rem; }}
+.pi-kpi-basis {{ margin-top: -0.9rem; }}
 
 @media (max-width: 760px) {{
   .pi-hero {{ padding: 2rem 1.3rem; }}
@@ -260,7 +260,7 @@ def hero(title: str, dim: str, subtitle: str, pills: list[tuple[str, str, bool]]
                 for v, lab, solid in pills)
     st.session_state["_pi_section"] = 0
     st.markdown(f'<div class="pi-hero"><div class="pi-eyebrow">Portfolio Optimizer {DISCLAIMER}</div>'
-                f'<h1 class="pi-title">{_two_tone(dim, title)}</h1><div class="pi-sub">{subtitle}</div>'
+                f'<h1 class="pi-title">{_two_tone(dim, title)}</h1>' + (f'<div class="pi-sub">{subtitle}</div>' if subtitle else '') +
                 f'<div class="row">{p}</div></div>', unsafe_allow_html=True)
 
 

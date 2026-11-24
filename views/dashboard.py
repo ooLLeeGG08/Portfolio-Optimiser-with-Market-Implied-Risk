@@ -15,16 +15,11 @@ pa = state.portfolio()
 s = mb.settings
 
 ui.hero(
-    "dashboard", "Portfolio",
-    f"A {len(mb.spec.tickers)}-asset portfolio measured against {s.benchmark}, valued in {config.BASE_CURRENCY}"
-    + (" (foreign listings converted, unhedged)" if mb.foreign_assets else "")
-    + f". Prices to {mb.as_of:%d %b %Y}; "
-    f"risk-free rate {ui.pct(mb.risk_free_rate, 2)} ({mb.risk_free_source}).",
+    "dashboard", "Portfolio", "",
     [(ui.money(pa.current_value), f"hypothetical value from {ui.money(mb.spec.initial_value)}", True),
      (ui.pct(pa.risk.annualized_volatility), "volatility, observed", False),
      (ui.num(pa.risk.sharpe), "Sharpe ratio, observed", False),
      (f"{s.horizon_days}d", "risk horizon", False)])
-ui.basis_legend()
 if mb.exclusion_message:
     st.warning(mb.exclusion_message, icon=":material/warning:")
 for e in mb.errors:
