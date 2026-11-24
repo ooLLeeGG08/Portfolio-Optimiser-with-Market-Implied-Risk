@@ -84,7 +84,10 @@ def efficient_frontier_chart(points: pd.DataFrame, random: pd.DataFrame, strateg
              "Historical average annual return (%)", height=460)
     f.add_trace(go.Scatter(x=random.volatility, y=random.expected_return, mode="markers",
                            name="Random long-only portfolios",
-                           marker=dict(size=4, color=random.sharpe, colorscale=[[0, "#2A2A2D"], [1, T.ACCENT_SOFT]], opacity=0.55,
+                           # Each point outlined in the background colour so overlapping portfolios read as
+                           # separate dots rather than one orange cloud.
+                           marker=dict(size=6, color=random.sharpe, colorscale=[[0, "#2A2A2D"], [1, T.ACCENT_SOFT]], opacity=0.9,
+                                       line=dict(color=T.BG, width=0.8),
                                        colorbar=dict(title="Sharpe", thickness=10, x=1.02)),
                            hovertemplate="vol %{x:.1%}, return %{y:.1%}<extra></extra>"))
     f.add_trace(go.Scatter(x=points.volatility, y=points.expected_return, mode="lines",
@@ -99,7 +102,9 @@ def efficient_frontier_chart(points: pd.DataFrame, random: pd.DataFrame, strateg
                                              f"<br>Sharpe {s.stats.sharpe:.2f}<extra></extra>"))
     f.update_xaxes(tickformat=".0%")
     f.update_yaxes(tickformat=".0%")
-    f.update_layout(legend=dict(orientation="v", y=0.02, yanchor="bottom", x=0.99, xanchor="right"))
+    # Legend below the chart, not on top of the points; the bottom margin leaves room for it to wrap.
+    f.update_layout(height=600, margin=dict(b=150),
+                    legend=dict(orientation="h", yanchor="top", y=-0.16, x=0, xanchor="left"))
     return f
 
 
