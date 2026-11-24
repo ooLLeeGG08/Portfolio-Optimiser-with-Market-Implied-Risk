@@ -105,7 +105,7 @@ h3.pi-takeaway-title {{ margin: 0 0 0.35rem 0 !important; font-size: 0.95rem !im
 .pi-chart-title {{ font-size: 0.82rem; font-weight: 600; color: {T.TEXT}; line-height: 1.35; margin: 0.4rem 0 -0.4rem 0; text-wrap: pretty; }}
 /* Phones and tablets (no hover): Streamlit shows table toolbars permanently, 44px above the table,
    where they covered the heading or caption. Give them their own row there. Plotly's toolbar is
-   hidden on touch screens; pinch and drag still work on the chart. */
+   hidden on touch screens; tapping a chart still shows its values. */
 @media (hover: none) {{
   [data-testid="stDataFrame"] {{ margin-top: 2.6rem; }}
   .modebar-container {{ display: none !important; }}
@@ -319,6 +319,9 @@ def chart(fig, description: str | None = None) -> None:
         legend = legend and fig.layout.showlegend is not False
         fig.update_layout(title_text=None, margin_t=fig.layout.margin.t if legend and fig.layout.margin.t else (44 if legend else 20))
         st.markdown(f'<div class="pi-chart-title" aria-hidden="true">{html.escape(title)}</div>', unsafe_allow_html=True)
+    # No drag-to-zoom: on phones a finger scrolling past a chart zoomed it by accident. Hovering or
+    # tapping still shows values, and desktop users can still zoom from the chart toolbar.
+    fig.update_layout(dragmode=False)
     st.markdown(f'<p class="pi-sr">{html.escape(text)}</p>', unsafe_allow_html=True)
     st.plotly_chart(fig, width="stretch", theme=None, config={"displaylogo": False})
 

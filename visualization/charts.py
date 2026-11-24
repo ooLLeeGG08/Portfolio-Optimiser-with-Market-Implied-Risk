@@ -54,7 +54,7 @@ def drawdown_chart(values: pd.Series, benchmark: pd.Series | None = None, bench_
     if benchmark is not None:
         bd = benchmark / benchmark.cummax() - 1
         f.add_trace(go.Scatter(x=bd.index, y=bd, name=bench_name, line=dict(width=1, color=T.MUTED)))
-    f.update_yaxes(tickformat=".0%")
+    f.update_yaxes(tickformat=".1~%")
     return f
 
 
@@ -73,7 +73,7 @@ def rolling_vol_chart(df: pd.DataFrame, title: str = "Rolling realised volatilit
     f = _fig(title, None, "Annualised volatility (%)")
     for i, c in enumerate(df.columns):
         f.add_trace(go.Scatter(x=df.index, y=df[c], name=c, line=dict(width=1.4, color=T.SERIES[i % 10])))
-    f.update_yaxes(tickformat=".0%")
+    f.update_yaxes(tickformat=".1~%")
     return f
 
 
@@ -100,8 +100,8 @@ def efficient_frontier_chart(points: pd.DataFrame, random: pd.DataFrame, strateg
                                            line=dict(color=T.BG, width=1)),
                                hovertemplate=f"{s.strategy.value}<br>vol %{{x:.1%}}<br>return %{{y:.1%}}"
                                              f"<br>Sharpe {s.stats.sharpe:.2f}<extra></extra>"))
-    f.update_xaxes(tickformat=".0%")
-    f.update_yaxes(tickformat=".0%")
+    f.update_xaxes(tickformat=".1~%")
+    f.update_yaxes(tickformat=".1~%")
     # Legend below the chart, not on top of the points; the bottom margin leaves room for it to wrap.
     f.update_layout(height=600, margin=dict(b=150),
                     legend=dict(orientation="h", yanchor="top", y=-0.16, x=0, xanchor="left"))
@@ -115,7 +115,7 @@ def weights_chart(strategies, title: str = "Asset allocation by strategy") -> go
                            marker_color=T.SERIES[(i + 1) % 10]))
     f.update_layout(barmode="group", height=440,
                     legend=dict(orientation="h", yanchor="top", y=-0.12, xanchor="left", x=0))
-    f.update_yaxes(tickformat=".0%")
+    f.update_yaxes(tickformat=".1~%")
     return f
 
 
@@ -135,7 +135,7 @@ def sensitivity_chart(summary: pd.DataFrame) -> go.Figure:
                            error_y=dict(type="data", symmetric=False, thickness=2, width=7,
                                         array=summary["p95"] - summary["mean"],
                                         arrayminus=summary["mean"] - summary["p05"], color=T.MUTED)))
-    f.update_yaxes(tickformat=".0%")
+    f.update_yaxes(tickformat=".1~%")
     f.update_layout(margin=dict(b=90), legend=dict(orientation="h", yanchor="top", y=-0.12, x=0, xanchor="left"))
     return f
 
@@ -150,7 +150,7 @@ def risk_contribution_chart(table: pd.DataFrame, basis: RiskBasis,
     f.add_trace(go.Bar(x=t.index, y=t["pct_contribution"], name="Share of volatility (Euler)",
                        marker_color=T.BASIS_COLORS[basis]))
     f.update_layout(barmode="group")
-    f.update_yaxes(tickformat=".0%")
+    f.update_yaxes(tickformat=".1~%")
     return f
 
 
@@ -162,7 +162,7 @@ def return_distribution_chart(returns: pd.Series, var95: float, var99: float) ->
     for v, lab, c, pos in ((var95, "95% VaR", T.SERIES[2], "top right"), (var99, "99% VaR", T.NEGATIVE, "top left")):
         f.add_vline(x=-v, line=dict(color=c, dash="dash", width=1.5), annotation_position=pos,
                     annotation=dict(text=f"{lab}: −{v:.2%}", font=dict(color=c, size=11)))
-    f.update_xaxes(tickformat=".0%")
+    f.update_xaxes(tickformat=".1~%")
     f.update_layout(showlegend=False)
     return f
 
@@ -176,7 +176,7 @@ def correlation_stress_chart(profile: pd.DataFrame, base_basis: RiskBasis) -> go
     f.add_trace(go.Scatter(x=[0], y=[profile["portfolio_volatility"].iloc[0]], mode="markers",
                            name=f"Baseline ({T.BASIS_SHORT[base_basis]})",
                            marker=dict(size=11, color=T.BASIS_COLORS[base_basis])))
-    f.update_yaxes(tickformat=".0%")
+    f.update_yaxes(tickformat=".1~%")
     return f
 
 
@@ -217,7 +217,7 @@ def forecast_test_chart(df: pd.DataFrame, name: str, horizon: int) -> go.Figure:
     f.add_trace(go.Scatter(x=df.index, y=df["hist_60d"], name="Historical 60d", line=dict(color=T.MUTED, width=1.2, dash="dot")))
     f.add_trace(go.Scatter(x=df.index, y=df["garch"], name="GARCH(1,1)", line=dict(color=T.BASIS_COLORS[RiskBasis.FORECAST], width=1.6)))
     f.add_trace(go.Scatter(x=df.index, y=df["lstm"], name="LSTM (median)", line=dict(color=T.ACCENT, width=1.6)))
-    f.update_yaxes(tickformat=".0%")
+    f.update_yaxes(tickformat=".1~%")
     return f
 
 
@@ -249,7 +249,7 @@ def volatility_comparison_chart(rows: pd.DataFrame, horizon: int) -> go.Figure:
                                marker=dict(size=12, symbol=symbols.get(lab, "circle"), color=color,
                                            line=dict(color=T.BG, width=1)),
                                hovertemplate=f"{lab}: %{{y:.1%}}<extra>%{{x}}</extra>"))
-    f.update_yaxes(tickformat=".0%")
+    f.update_yaxes(tickformat=".1~%")
     f.update_layout(legend=dict(orientation="h", y=1.0))
     return f
 
@@ -272,7 +272,7 @@ def vix_chart(frame: pd.DataFrame, years: int = 5) -> go.Figure:
     for c, col in (("mean_60d", T.MUTED), ("mean_252d", T.SERIES[2])):
         f.add_trace(go.Scatter(x=d.index, y=d[c], name=c.replace("mean_", "").replace("d", "-day mean"),
                                line=dict(color=col, width=1.2, dash="dot")))
-    f.update_yaxes(tickformat=".0%")
+    f.update_yaxes(tickformat=".1~%")
     return f
 
 
@@ -284,7 +284,7 @@ def vrp_chart(frame: pd.DataFrame, years: int = 5) -> go.Figure:
                            line=dict(color=T.BASIS_COLORS[RiskBasis.MARKET_IMPLIED], width=1.3)))
     f.add_trace(go.Scatter(x=d.index, y=d.realized_fwd, name="Subsequently realised (SPY)",
                            line=dict(color=T.TEXT, width=1.1)))
-    f.update_yaxes(tickformat=".0%")
+    f.update_yaxes(tickformat=".1~%")
     return f
 
 
@@ -295,7 +295,7 @@ def term_structure_chart(ts: pd.DataFrame, ticker: str, target_days: float) -> g
                            line=dict(color=T.BASIS_COLORS[RiskBasis.MARKET_IMPLIED])))
     f.add_vline(x=target_days, line=dict(color=T.MUTED, dash="dot"),
                 annotation=dict(text=f"forecast horizon ≈ {target_days:.0f} days", font=dict(color=T.MUTED, size=10)))
-    f.update_yaxes(tickformat=".0%")
+    f.update_yaxes(tickformat=".1~%")
     return f
 
 
@@ -307,7 +307,7 @@ def smile_chart(smile: pd.DataFrame, ticker: str, expiry, spot: float) -> go.Fig
         f.add_trace(go.Scatter(x=s.strike, y=s.iv, mode="markers", name=f"{kind.title()}s (OTM filled, ITM hollow)",
                                marker=dict(color=col, size=7, symbol=["circle" if o else "circle-open" for o in s.otm])))
     f.add_vline(x=spot, line=dict(color=T.MUTED, dash="dot"), annotation=dict(text="spot", font=dict(color=T.MUTED, size=10)))
-    f.update_yaxes(tickformat=".0%")
+    f.update_yaxes(tickformat=".1~%")
     return f
 
 
