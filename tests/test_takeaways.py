@@ -49,3 +49,18 @@ def test_drawdown_sentence_with_and_without_recovery():
     open_md = MaxDrawdown(-0.1, pd.Timestamp("2026-01-02"), pd.Timestamp("2026-03-02"), None, 40, None)
     assert "not yet recovered" in worst_drawdown(open_md).text
     assert len(key_takeaways(_rc([1/3] * 3, [0.2] * 3, np.eye(3)), None, md)) == 3
+
+
+def test_weight_uncertainty_sentence():
+    from app_core.takeaways import weight_uncertainty
+    s = pd.DataFrame({"point_estimate": [0.29, 0.0, 0.0, 0.71], "mean": [0.25, 0.06, 0.04, 0.65],
+                      "p05": [0.0, 0.0, 0.0, 0.40], "p95": [0.56, 0.24, 0.27, 0.90]},
+                     index=["AAPL", "XOM", "TLT", "GLD"])
+    t = weight_uncertainty(s)
+    assert t.startswith("The widest range is AAPL: anywhere from 0% to 56% of the portfolio")
+    assert "All 4 assets have a range of 20 percentage points or more" in t
+    assert "XOM and TLT get 0% in the “best” mix but about 6% for XOM and 4% for TLT on average" in t
+    assert t.endswith("not as a recommendation.")
+    narrow = pd.DataFrame({"point_estimate": [0.5, 0.5], "mean": [0.5, 0.5], "p05": [0.45, 0.45],
+                           "p95": [0.55, 0.55]}, index=["A", "B"])
+    assert "rough" not in weight_uncertainty(narrow)

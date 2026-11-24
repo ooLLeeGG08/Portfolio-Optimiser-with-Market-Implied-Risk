@@ -77,3 +77,29 @@ def worst_drawdown(md: MaxDrawdown) -> Takeaway:
 
 def key_takeaways(rc: RiskContribution, vix: VixSummary | None, md: MaxDrawdown) -> list[Takeaway]:
     return [risk_concentration(rc), vix_level(vix), worst_drawdown(md)]
+
+
+def _names(items: list[str]) -> str:
+    return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
+
+
+def weight_uncertainty(summary: pd.DataFrame) -> str:
+    """One plain-English reading of the max-Sharpe sensitivity results (columns point_estimate,
+    mean, p05, p95 per asset), written from the numbers."""
+    width = summary["p95"] - summary["p05"]
+    a = width.idxmax()
+    text = (f"The widest range is {a}: anywhere from {_p(summary.loc[a, 'p05'], 0)} to "
+            f"{_p(summary.loc[a, 'p95'], 0)} of the portfolio, depending on small changes in past returns.")
+    wide = int((width >= 0.20).sum())
+    if wide >= 2:
+        share = f"All {wide}" if wide == len(summary) else f"{wide} of the {len(summary)}"
+        text += f" {share} assets have a range of 20 percentage points or more."
+    dropped = [t for t in summary.index if summary.loc[t, "point_estimate"] < 0.005 and summary.loc[t, "mean"] >= 0.01]
+    if dropped:
+        avg = (_p(summary.loc[dropped[0], "mean"], 0) if len(dropped) == 1
+               else _names([f"{_p(summary.loc[t, 'mean'], 0)} for {t}" for t in dropped]))
+        text += (f" {_names(dropped)} {'gets' if len(dropped) == 1 else 'get'} 0% in the “best” mix but "
+                 f"about {avg} on average, so leaving {'it' if len(dropped) == 1 else 'them'} out is not a firm result.")
+    if width.max() >= 0.20:
+        text += " Treat the exact weights as rough, not as a recommendation."
+    return text

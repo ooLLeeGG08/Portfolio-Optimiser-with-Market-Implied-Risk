@@ -120,15 +120,23 @@ def weights_chart(strategies, title: str = "Asset allocation by strategy") -> go
 
 
 def sensitivity_chart(summary: pd.DataFrame) -> go.Figure:
-    f = _fig("Max-Sharpe weights under return estimation error", None, "Weight (%)")
-    f.add_trace(go.Bar(x=summary.index, y=summary["point_estimate"], name="Point estimate",
-                       marker_color=T.ACCENT))
-    f.add_trace(go.Scatter(x=summary.index, y=summary["mean"], mode="markers", name="Mean of resamples (5–95% range)",
-                           marker=dict(color=T.TEXT, size=8),
-                           error_y=dict(type="data", symmetric=False,
+    """Maximum-Sharpe weights and how much they move when past returns are nudged within their
+    uncertainty. Labels are written for readers without a finance background."""
+    f = _fig("How much should go into each asset, and how sure is that?", None, "Share of the portfolio (%)",
+             height=470)
+    rng = [f"{lo:.0%} to {hi:.0%}" for lo, hi in zip(summary["p05"], summary["p95"])]
+    f.add_trace(go.Bar(x=summary.index, y=summary["point_estimate"], name="“Best” mix, using the past exactly as it was",
+                       marker_color=T.ACCENT, customdata=rng,
+                       hovertemplate="%{x}<br>“Best” mix: %{y:.0%}<extra></extra>"))
+    f.add_trace(go.Scatter(x=summary.index, y=summary["mean"], mode="markers",
+                           name="Typical answer (dot) and likely range (line)",
+                           marker=dict(color=T.TEXT, size=9, line=dict(color=T.BG, width=1)), customdata=rng,
+                           hovertemplate="%{x}<br>Typical answer: %{y:.0%}<br>Likely range: %{customdata}<extra></extra>",
+                           error_y=dict(type="data", symmetric=False, thickness=2, width=7,
                                         array=summary["p95"] - summary["mean"],
                                         arrayminus=summary["mean"] - summary["p05"], color=T.MUTED)))
     f.update_yaxes(tickformat=".0%")
+    f.update_layout(margin=dict(b=90), legend=dict(orientation="h", yanchor="top", y=-0.12, x=0, xanchor="left"))
     return f
 
 

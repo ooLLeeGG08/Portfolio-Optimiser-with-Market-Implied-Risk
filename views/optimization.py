@@ -2,6 +2,7 @@ import pandas as pd
 import streamlit as st
 
 from app_core.pipeline import AnalysisSettings
+from app_core.takeaways import weight_uncertainty
 from core.types import RiskBasis
 from portfolio.optimization import Strategy, comparison_table, identical_strategy_notes
 from ui import components as ui
@@ -87,11 +88,19 @@ ui.methodology([
     "re-solved for each draw.",
 ])
 if oa.sensitivity is not None:
-    ui.chart(charts.sensitivity_chart(oa.sensitivity.summary))
-    st.caption(f"Historical average returns were redrawn {oa.sensitivity.n_requested} times from their sampling distribution "
-               f"N(μ̂, Σ/years) and the maximum-Sharpe portfolio re-solved each time"
-               + (f" ({oa.sensitivity.n_failed} draws had no asset above the risk-free rate and were skipped)." if oa.sensitivity.n_failed else ".")
-               + " Wide ranges mean the optimal weights are not statistically well determined.")
+    sens = oa.sensitivity
+    n_ok = sens.n_requested - sens.n_failed
+    st.markdown(
+        f"**How to read the chart below.** The *Maximum Sharpe* strategy looks for the mix of assets that earned the "
+        f"most per unit of risk in the past. The **orange bars** are its answer using the last {inp.n_obs / 252:.0f} "
+        f"years exactly as they happened. But past returns are noisy, so the app nudged them {n_ok} times within "
+        f"their normal uncertainty and asked the same question each time. The **white dot** is the typical answer "
+        f"and the **grey line** covers 9 out of 10 answers. **A long line means that weight is mostly guesswork.**")
+    ui.chart(charts.sensitivity_chart(sens.summary))
+    st.markdown(f"**What it shows here:** {weight_uncertainty(sens.summary)}")
+    if sens.n_failed:
+        st.caption(f"{sens.n_failed} of the {sens.n_requested} nudged versions had no asset beating the risk-free "
+                   f"rate, so Maximum Sharpe had no answer for them; they are left out.")
 elif oa.sensitivity_error:
     st.caption(f"Sensitivity analysis unavailable: {oa.sensitivity_error}")
 
