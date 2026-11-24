@@ -39,10 +39,18 @@ hz = st.segmented_control("Horizon (trading days)", [1, 5, 10, 21], default=1, k
 est = pa.tail_risk if hz == 1 else tail_risk_at_horizon(mb, pa, hz)
 df = to_frame(est).drop(columns=["Horizon (days)", "Basis"])
 notes_by_method = df[["Method", "Confidence", "Notes"]]
-df.loc[df["VaR"].isna(), "Method"] = df.loc[df["VaR"].isna(), "Method"] + " — not reported (see notes below)"
+# Short method names keep the pinned columns narrow on phones; the full names are in the notes below.
+df["Method"] = [m.split(" (")[0] for m in df["Method"]]  # "Monte Carlo (Student-t, nu=4.5)" -> "Monte Carlo"
 show = df.drop(columns="Notes").rename(columns={"VaR": "VaR (% of value)", "CVaR": "CVaR (% of value)"})
+# Method and Confidence stay visible while the numbers scroll sideways (on phones the table is wider than the screen).
 ui.gap_table(show, {"Confidence": "{:.0%}", "VaR (% of value)": "{:.2%}", "CVaR (% of value)": "{:.2%}",
-                    "VaR amount": "${:,.0f}", "CVaR amount": "${:,.0f}"}, hide_index=True, width="stretch")
+                    "VaR amount": "${:,.0f}", "CVaR amount": "${:,.0f}"}, hide_index=True, width="stretch",
+             column_config={"Method": st.column_config.TextColumn(pinned=True),
+                            "Confidence": st.column_config.TextColumn(alignment="right", pinned=True)})
+missing = list(dict.fromkeys(df.loc[df["VaR"].isna(), "Method"]))
+if missing:
+    st.caption(f"“n/a”: {' and '.join(missing)} {'is' if len(missing) == 1 else 'are'} not reported for this portfolio; "
+               f"the reason is in the notes below.")
 # Notes are full sentences, listed below the table so they are never cut off. Sentences shared by both
 # confidence levels are shown once; the rest are prefixed with their confidence level.
 lines = []
