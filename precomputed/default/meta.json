@@ -1,7 +1,7 @@
 {
   "format_version": 1,
-  "generated_at": "2026-11-25T05:01:22+00:00",
-  "data_as_of": "2026-11-24T00:00:00",
+  "generated_at": "2026-11-26T04:18:32+00:00",
+  "data_as_of": "2026-11-25T00:00:00",
   "horizon_days": 21,
   "settings": {
     "tickers": [
@@ -44,8 +44,8 @@
     "Portfolio"
   ],
   "failures": {},
-  "runtime_seconds": 106,
-  "code_commit": "c5729e8",
+  "runtime_seconds": 139,
+  "code_commit": "9216152",
   "python": "3.12.16",
   "torch": "2.15.0+cpu",
   "arch": "9.0.0"
